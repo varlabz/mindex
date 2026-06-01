@@ -220,6 +220,17 @@ def info(file_path: Path, index_path: Path) -> dict:
         }
 
 
+def show_file(file_path: Path, index_path: Path, position: int = 0, size: int | None = None) -> str:
+    """Show file content from position with optional size limit."""
+    abs_path = str(file_path)
+    with _db(index_path) as conn:
+        doc = conn.execute("SELECT content FROM docs WHERE path = ?", (abs_path,)).fetchone()
+        if not doc: raise ValueError(f"File not indexed: {file_path}")
+
+        content = doc["content"]
+        return content[position:position + size] if size else content[position:]
+
+
 def delete_file(file_path: Path, index_path: Path):
     """Delete a file from the index."""
     abs_path = str(file_path)
@@ -277,24 +288,22 @@ def main():
         epilog="""
 Examples:
   mindex.py add articles/sqlite.md --title "SQLite FTS5" --summary "Indexing guide"
-  mindex.py --index_dir ~/my-wiki add articles/notes.md --title "Notes" --summary "Quick notes"
+  mindex.py --index ~/my-wiki add articles/notes.md --title "Notes" --summary "Quick notes"
   mindex.py add articles/notes.md --title "Notes" --summary "Quick notes" --tags ai sqlite
   mindex.py add articles/notes.md --title "Notes" --summary "Quick notes" --source "https://example.com/original"
   mindex.py search "sqlite fts5"
   mindex.py search "agent memory" --limit 20
-  mindex.py tags --add articles/notes.md ai,sqlite
-  mindex.py tags --remove articles/notes.md draft
-  mindex.py tags --list
-  mindex.py list
-  mindex.py list --tag ai
-  mindex.py list --tags
+  mindex.py search "agent memory" --file articles/notes.md
+  mindex.py search "agent memory" --json
+  mindex.py tags
   mindex.py info articles/notes.md
-  mindex.py rebuild
+  mindex.py info articles/notes.md --json
+  mindex.py rm articles/notes.md
         """
     )
 
     # Top-level --index option
-    parser.add_argument("--index_dir", "-i", default=".", help="Index directory (default: current dir)")
+    parser.add_argument("--index", "-i", default=".", help="Index directory (default: current dir)")
 
     sub = parser.add_subparsers(dest="command", help="Command to run")
 
@@ -325,6 +334,12 @@ Examples:
     p_info_fmt.add_argument("--json", action="store_true", help="Output as JSON")
     p_info_fmt.add_argument("--text", action="store_true", help="Output as text")
 
+    # show
+    p_show = sub.add_parser("show", help="Show file content from position")
+    p_show.add_argument("file", help="Markdown file path")
+    p_show.add_argument("--position", "-p", type=int, default=0, help="Start position (default: 0)")
+    p_show.add_argument("--size", "-s", type=int, help="Number of characters to show")
+
     # rm/delete
     p_rm = sub.add_parser("rm", aliases=["delete"], help="Remove file from index")
     p_rm.add_argument("file", help="Markdown file path to remove")
@@ -335,8 +350,10 @@ Examples:
         parser.print_help()
         return
 
-    index_path = Path(os.path.abspath(args.index_dir))
+    # can use ~index_dir to specify a different directory for the index file, defaults to current dir
+    index_path = Path(os.path.expanduser(args.index))
     if not index_path.exists(): index_path.mkdir(parents=True)
+
     cmd = args.command
 
     if cmd == "add":
@@ -362,8 +379,10 @@ Examples:
     elif cmd == "tags":
         print("\n".join(list_tags(index_path=index_path)))
 
-    elif cmd == "list":
-        list_docs(args.tag, args.sort, show_tags=args.tags, index_path=index_path)
+    elif cmd == "show":
+        file_path = _resolve_file(args.file)
+        content = show_file(file_path, index_path=index_path, position=args.position, size=args.size)
+        print(content)
 
     elif cmd == "info":
         file_path = _resolve_file(args.file)

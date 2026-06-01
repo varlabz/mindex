@@ -53,7 +53,7 @@ Repository = "https://github.com/yourusername/mindex.git"
 Issues = "https://github.com/yourusername/mindex/issues"
 
 [project.scripts]
-mindex = "mindex.mindex:main"
+mindex-cli = "mindex.mindex:main"
 
 [tool.setuptools]
 package-dir = {"" = "."}

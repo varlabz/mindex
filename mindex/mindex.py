@@ -20,17 +20,6 @@ from pathlib import Path
 
 DB_PATH = "mindex.sqlite"       # index file stored in vault directory
 
-def _normalize_tags(tags: list[str]) -> list[str]:
-    """Normalize a list of tags: strip, lowercase, deduplicate."""
-    seen: set[str] = set()
-    result: list[str] = []
-    for t in tags:
-        t = t.strip().lower()
-        if t and t not in seen:
-            seen.add(t)
-            result.append(t)
-    return result
-
 
 class _db:
     """Context-manager wrapper for sqlite3.Connection with auto-close."""
@@ -197,117 +186,16 @@ def search(query: str, index_path: Path, limit: int = 10, file_path: Path | None
 
 # ── Tags ──────────────────────────────────────────────────────────
 
-def manage_tags(file_path: Path, index_path: Path, add_tags: list[str] | None = None,
-                remove_tags: list[str] | None = None):
-    """Add or remove tags from a file."""
-    abs_path = str(file_path)
-    with _db(index_path) as conn:
-        doc = conn.execute("SELECT id, content FROM docs WHERE path = ?", (abs_path,)).fetchone()
-
-        if not doc:
-            print(f"  ✗ File not indexed: {file_path}", file=sys.stderr)
-            print(f"     Run: python md-index.py add {file_path}", file=sys.stderr)
-            return
-
-        doc_id = doc["id"]
-
-        if add_tags:
-            normalized = _normalize_tags(add_tags)
-            for tag in normalized:
-                conn.execute(
-                    """INSERT OR IGNORE INTO tags (doc_id, tag) VALUES (?, ?)""",
-                    (doc_id, tag)
-                )
-            print(f"  ✓ Added tags to {abs_path}: {', '.join(normalized)}")
-
-        if remove_tags:
-            normalized = _normalize_tags(remove_tags)
-            for tag in normalized:
-                conn.execute(
-                    "DELETE FROM tags WHERE doc_id = ? AND tag = ?",
-                    (doc_id, tag)
-                )
-            print(f"  ✓ Removed tags from {abs_path}: {', '.join(normalized)}")
-
-        # Rebuild searchable content with current tags
-        all_tags = [r["tag"] for r in conn.execute(
-            "SELECT tag FROM tags WHERE doc_id = ?", (doc_id,)
-        ).fetchall()]
-        if all_tags:
-            conn.execute(
-                "UPDATE docs SET content = ?, updated_at = datetime('now') WHERE id = ?",
-                (_build_searchable_content(doc["content"], all_tags), doc_id)
-            )
-
-        conn.commit()
-
-
-def list_tags(index_path: Path = Path(".")):
-    """List all tags and their document counts."""
+def list_tags(index_path: Path) -> set[str]:
+    """List all unique tag names."""
     with _db(index_path) as conn:
         rows = conn.execute("""
-            SELECT t.tag, COUNT(t.doc_id) AS count
+            SELECT DISTINCT t.tag
             FROM tags t
-            GROUP BY t.tag
-            ORDER BY count DESC, t.tag
+            ORDER BY t.tag
         """).fetchall()
 
-        if not rows:
-            print("  ✗ No tags found. Add tags with:", file=sys.stderr)
-            print(f"     python md-index.py tags --add <file.md> tag1,tag2", file=sys.stderr)
-            return
-
-        print(f"\n  Tags ({len(rows)} total):\n")
-        for r in rows:
-            print(f"  • {r['tag']:<25} ({r['count']} doc{'s' if r['count'] != 1 else ''})")
-        print()
-
-
-def list_docs(tag: str | None = None, sort: str = "updated", show_tags: bool = False, index_path: Path = Path(".")):
-    """List all indexed documents, optionally filtered by tag."""
-    with _db(index_path) as conn:
-        base = """
-            SELECT d.path, d.title, d.word_count, d.updated_at,
-                   GROUP_CONCAT(t.tag, ', ') AS tags
-            FROM docs d
-            LEFT JOIN tags t ON t.doc_id = d.id
-        """
-
-        conditions = []
-        params = []
-
-        if tag:
-            conditions.append("d.id IN (SELECT doc_id FROM tags WHERE tag = ?)")
-            params.append(tag)
-
-        where = " WHERE " + " AND ".join(conditions) if conditions else ""
-        sort_col = "updated_at" if sort == "updated" else "title"
-        sql = f"{base}{where} GROUP BY d.id ORDER BY {sort_col} DESC"
-
-        rows = conn.execute(sql, params).fetchall()
-
-        if not rows:
-            print("  ✗ No documents found.", file=sys.stderr)
-            return
-
-        print(f"\n  Documents ({len(rows)} total)")
-        if tag:
-            print(f"  Tag filter: {tag}")
-        print(f"  {'='*70}\n")
-
-        for r in rows:
-            tag_str = r['tags'] or "—"
-            if show_tags and tag_str != "—":
-                print(f"  • {r['title']:<35} ({r['word_count']} words)")
-                print(f"    Path:   {r['path']}")
-                print(f"    Updated:{r['updated_at']}")
-                print(f"    Tags:   {tag_str}")
-                print(f"  {'─'*70}")
-            else:
-                print(f"  • {r['title']:<40} [{tag_str}]")
-                print(f"    {r['path']}  ({r['word_count']} words, {r['updated_at']})")
-
-        print()
+        return {r["tag"] for r in rows}
 
 
 def info(file_path: Path, index_path: Path) -> dict:
@@ -371,6 +259,17 @@ def _format_search_results_json(rows: list[sqlite3.Row]) -> str:
     return json.dumps([{"path": r["path"], "title": r["title"], "snippet": r["snippet"]} for r in rows], indent=2)
 
 
+def _normalize_tags(tags: list[str]) -> list[str]:
+    """Normalize a list of tags: strip, lowercase, deduplicate."""
+    seen: set[str] = set()
+    result: list[str] = []
+    for t in tags:
+        t = t.strip().lower()
+        if t and t not in seen:
+            seen.add(t)
+            result.append(t)
+    return result
+
 def main():
     parser = argparse.ArgumentParser(
         description="Markdown Wiki Indexer — MD files + SQLite FTS5 search",
@@ -403,8 +302,8 @@ Examples:
     p_add = sub.add_parser("add", help="Add markdown file to index")
     p_add.add_argument("file", help="Markdown file to add. ")
     p_add.add_argument("--tags", "-t", nargs="+", help="Tags to assign to the file (space or comma separated)")
-    p_add.add_argument("--title", "-T", required=True, help="Custom title for the file (required)")
-    p_add.add_argument("--summary", "-S", required=True, help="Custom summary text (required)")
+    p_add.add_argument("--title", "-T", help="Custom title for the file (required)")
+    p_add.add_argument("--summary", "-S", help="Custom summary text (required)")
     p_add.add_argument("--source", "-s", help="Source URL or reference (default: full file path)")
 
     # search
@@ -417,16 +316,7 @@ Examples:
     p_search_fmt.add_argument("--text", action="store_true", help="Output as text")
 
     # tags
-    p_tags = sub.add_parser("tags", help="Manage tags")
-    p_tags.add_argument("--add", nargs=2, metavar=("FILE", "TAGS"), help="Add tags to file")
-    p_tags.add_argument("--remove", nargs=2, metavar=("FILE", "TAGS"), help="Remove tags from file")
-    p_tags.add_argument("--list", "-l", action="store_true", help="List all tags")
-
-    # list
-    p_list = sub.add_parser("list", help="List indexed documents")
-    p_list.add_argument("--tag", "-t", help="Filter by tag")
-    p_list.add_argument("--sort", "-s", choices=["updated", "title"], default="updated")
-    p_list.add_argument("--tags", action="store_true", help="Show tags for each document")
+    p_tags = sub.add_parser("tags", help="List all tags")
 
     # info
     p_info = sub.add_parser("info", help="Show file details")
@@ -470,20 +360,7 @@ Examples:
             print(f"  ✗ No results for: {args.query}", file=sys.stderr)
 
     elif cmd == "tags":
-        if args.list:
-            list_tags(index_path=index_path)
-        elif args.add:
-            file_path = _resolve_file(args.add[0])
-            tag_list = [x.strip() for t in args.tags or [] for x in t.split(",") if x.strip()]
-            normalized_tags = _normalize_tags(tag_list)
-            manage_tags(file_path, index_path=index_path, add_tags=normalized_tags)
-        elif args.remove:
-            file_path = _resolve_file(args.remove[0])
-            tag_list = [x.strip() for t in args.tags or [] for x in t.split(",") if x.strip()]
-            normalized_tags = _normalize_tags(tag_list)
-            manage_tags(file_path, index_path=index_path, remove_tags=normalized_tags)
-        else:
-            list_tags(index_path=index_path)
+        print("\n".join(list_tags(index_path=index_path)))
 
     elif cmd == "list":
         list_docs(args.tag, args.sort, show_tags=args.tags, index_path=index_path)

@@ -8,6 +8,9 @@ from .mindex import (
     list_docs,
     info,
     delete_file,
+    _normalize_tags,
+    _build_searchable_content,
+    _db,
 )
 
 __version__ = "0.1.0"
@@ -19,4 +22,7 @@ __all__ = [
     "list_docs",
     "info",
     "delete_file",
+    "_normalize_tags",
+    "_build_searchable_content",
+    "_db",
 ]

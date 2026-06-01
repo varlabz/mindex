@@ -137,3 +137,4 @@ dmypy.json
 *.dbox
 
 tmp/
+.bash_history

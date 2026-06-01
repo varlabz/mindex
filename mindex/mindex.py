@@ -32,16 +32,6 @@ def _normalize_tags(tags: list[str]) -> list[str]:
     return result
 
 
-def _build_searchable_content(content: str, tags: list[str]) -> str:
-    """Append normalized tags to content for FTS searchability."""
-    if not tags:
-        return content
-    # Strip any existing #tags line before appending
-    if "\n#tags:" in content:
-        content = content.split("\n#tags:")[0]
-    return f"{content}\n\n#tags: {','.join(tags)}"
-
-
 class _db:
     """Context-manager wrapper for sqlite3.Connection with auto-close."""
     def __init__(self, index_dir: str = "."):
@@ -157,12 +147,6 @@ def add_file(file_path: Path, index_path: Path, tags: list[str] | None = None, t
                 """INSERT OR IGNORE INTO tags (doc_id, tag) VALUES (?, ?)""",
                 (doc_id, tag)
             )
-
-        # Include tags in searchable content
-        conn.execute(
-            """UPDATE docs SET content = ?, updated_at = datetime('now') WHERE id = ?""",
-            (_build_searchable_content(content, tag_list), doc_id)
-        )
 
         conn.commit()
         print(f"  ✓ Indexed: {action} {abs_path}")
@@ -326,27 +310,26 @@ def list_docs(tag: str | None = None, sort: str = "updated", show_tags: bool = F
         print()
 
 
-def info(file_path: Path, index_path: Path):
-    """Show details about an indexed file."""
+def info(file_path: Path, index_path: Path) -> dict:
+    """Return details about an indexed file as a dict."""
     abs_path = str(file_path)
     with _db(index_path) as conn:
         doc = conn.execute("SELECT * FROM docs WHERE path = ?", (abs_path,)).fetchone()
 
-        if not doc:
-            print(f"  ✗ File not indexed: {file_path}", file=sys.stderr)
-            return
+        if not doc: raise ValueError(f"  ✗ File not indexed: {file_path}")
 
         tags = [r["tag"] for r in conn.execute(
             "SELECT tag FROM tags WHERE doc_id = ?", (doc["id"],)
         ).fetchall()]
 
-        print(f"\n  📄 {doc['title']}")
-        print(f"  Path:   {doc['path']}")
-        print(f"  Words:  {doc['word_count']}")
-        print(f"  Updated:{doc['updated_at']}")
-        print(f"  Tags:   {', '.join(tags) if tags else '—'}")
-        print(f"  Summary:{doc['summary'][:200]}...")
-        print()
+        return {
+            "path": doc["path"],
+            "source": doc["source"],
+            "title": doc["title"],
+            "summary": doc["summary"],
+            "size": doc["word_count"],
+            "tags": tags,
+        }
 
 
 def delete_file(file_path: Path, index_path: Path):
@@ -428,10 +411,10 @@ Examples:
     p_search = sub.add_parser("search", help="Search indexed files")
     p_search.add_argument("query", help="Search query (FTS5 syntax)")
     p_search.add_argument("--limit", "-l", type=int, default=10, help="Max results")
-    p_search.add_argument("--file", "-f", help="Restrict search to a specific file")
+    p_search.add_argument("--file", "--path", help="Restrict search to a specific file")
     p_search_fmt = p_search.add_mutually_exclusive_group()
-    p_search_fmt.add_argument("--text", action="store_true", help="Output as text (default)")
     p_search_fmt.add_argument("--json", action="store_true", help="Output as JSON")
+    p_search_fmt.add_argument("--text", action="store_true", help="Output as text")
 
     # tags
     p_tags = sub.add_parser("tags", help="Manage tags")
@@ -448,6 +431,9 @@ Examples:
     # info
     p_info = sub.add_parser("info", help="Show file details")
     p_info.add_argument("file", help="Markdown file path")
+    p_info_fmt = p_info.add_mutually_exclusive_group()
+    p_info_fmt.add_argument("--json", action="store_true", help="Output as JSON")
+    p_info_fmt.add_argument("--text", action="store_true", help="Output as text")
 
     # rm/delete
     p_rm = sub.add_parser("rm", aliases=["delete"], help="Remove file from index")
@@ -469,11 +455,15 @@ Examples:
         normalized_tags = _normalize_tags(tag_list)
         add_file(file_path, index_path=index_path, tags=normalized_tags, title=args.title, summary=args.summary, source=args.source)
 
+    elif cmd in ["rm", "delete"]:
+        file_path = _resolve_file(args.file)
+        delete_file(file_path, index_path=index_path)
+
     elif cmd == "search":
         file_arg = _resolve_file(args.file) if args.file else None
         results = search(args.query, index_path=index_path, limit=args.limit, file_path=file_arg)
         if results:
-            output = _format_search_results_text(results) if args.text else _format_search_results_json(results)
+            output = _format_search_results_json(results) if args.json else _format_search_results_text(results)
             if output:
                 print(output)
         else:
@@ -499,12 +489,17 @@ Examples:
         list_docs(args.tag, args.sort, show_tags=args.tags, index_path=index_path)
 
     elif cmd == "info":
-        file_path = _resolve_file(args.info)
-        info(file_path, index_path=index_path)
-
-    elif cmd in ["rm", "delete"]:
         file_path = _resolve_file(args.file)
-        delete_file(file_path, index_path=index_path)
+        obj = info(file_path, index_path=index_path)
+        if args.json:
+            print(json.dumps(obj, indent=2))
+        else:
+            print(f"\n  File: {obj['path']}")
+            print(f"  Source: {obj['source']}")
+            print(f"  Title: {obj['title']}")
+            print(f"  Summary: {obj['summary']}")
+            print(f"  Size: {obj['size']} words")
+            print(f"  Tags: {', '.join(obj['tags']) if obj['tags'] else '—'}\n")
 
 
 if __name__ == "__main__":

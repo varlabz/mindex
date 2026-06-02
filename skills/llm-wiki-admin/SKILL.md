@@ -25,13 +25,13 @@ uvx --from git+https://github.com/varlabz/mindex mindex-cli --index <index_dir> 
 
 Digest markdown files into the searchable index. Title and summary are required for indexing.
 Summary should be a concise description of the file's content to improve search relevance. 
-Source is optional and can be a URL for where the content came from (defaults to file path if not provided).
-Tags are optional but recommended for better organization and discoverability.
+The flag `--source` is optional and can be a URL for where the content came from (defaults to file path if not provided).
+The flag `--tags` is optional but recommended for better organization and discoverability.
 Before creating tags, check existing tags with `mindex-cli tags` to maintain consistency.
 Reuses existing tags and creates new ones as needed. 
 
 ```bash
-mindex-cli --index <index_dir> add <file.md> --title "<title>" --summary "<summary>"
+mindex-cli --index <index_dir> add <file.md> --title "<title>" --summary "<summary>" --tags <tag1> <tag2> --source "<source_url>"
 ```
 
 **Options:**
@@ -105,6 +105,29 @@ mindex-cli --index <index_dir> rm <file.md>
 ```bash
 # Remove file from index
 mindex-cli --index <index_dir> rm notes/old-notes.md
+```
+
+---
+
+## List Tags
+
+List all tags across the indexed files.
+
+```bash
+mindex-cli --index <index_dir> tags
+```
+
+**Options:**
+
+| Flag | Short | Default | Description |
+|------|-------|---------|-------------|
+| `--index` | `-i` | current dir | Index directory |
+
+### Examples
+
+```bash
+# List all tags
+mindex-cli --index <index_dir> tags
 ```
 
 ---

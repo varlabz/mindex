@@ -189,25 +189,25 @@ class TestAddFilePositive:
             tag_list = [t["tag"] for t in tags]
             assert tag_list == ["python", "sqlite", "testing"]
 
-    def test_add_file_preserves_word_count(self, temp_workspace):
-        """Test that word count is calculated and stored correctly."""
-        test_file = temp_workspace / "words.md"
-        content = "# Title\n\nOne two three four five."  # 7 words
+    def test_add_file_preserves_size(self, temp_workspace):
+        """Test that file size in characters is calculated and stored correctly."""
+        test_file = temp_workspace / "chars.md"
+        content = "# Title\n\nOne two three four five."  # 33 characters
         test_file.write_text(content)
         
         mindex.add_file(
             test_file,
             index_path=temp_workspace,
-            title="Word Count Test",
-            summary="Testing word count"
+            title="Size Test",
+            summary="Testing character count"
         )
         
         with mindex._db(temp_workspace) as conn:
             doc = conn.execute(
-                "SELECT word_count FROM docs WHERE path = ?", 
+                "SELECT size FROM docs WHERE path = ?", 
                 (str(test_file),)
             ).fetchone()
-            assert doc["word_count"] == 7
+            assert doc["size"] == 33
 
     def test_add_file_with_duplicate_tags(self, temp_workspace):
         """Test that duplicate tags are deduplicated."""

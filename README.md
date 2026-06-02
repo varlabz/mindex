@@ -129,7 +129,7 @@ Defaults to current directory. Use `--index` (or `-i`) to specify a custom index
 - `title`: Document title
 - `content`: Full markdown content
 - `summary`: Brief description
-- `word_count`: Word count
+- `size`: File size in characters
 - `hash`: SHA-256 content hash for change detection
 - `created_at`, `updated_at`: Timestamps
 

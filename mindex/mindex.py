@@ -55,7 +55,7 @@ CREATE TABLE IF NOT EXISTS docs (
     title TEXT NOT NULL,                -- Document title extracted from markdown heading
     content TEXT NOT NULL,              -- Full document content (with tags for FTS)
     summary TEXT NOT NULL,              -- Short summary extracted from first paragraphs
-    word_count INTEGER DEFAULT 0,       -- Number of words in the document
+    size INTEGER DEFAULT 0,             -- File size in characters
     hash TEXT,                          -- SHA-256 file content hash for change detection
     created_at TEXT DEFAULT (datetime('now')),  -- Timestamp of record creation
     updated_at TEXT DEFAULT (datetime('now'))   -- Timestamp of last update
@@ -116,37 +116,35 @@ def add_file(
         # Skip unchanged files unless custom title/summary/tags provided
         existing = conn.execute("SELECT id, hash FROM docs WHERE path = ?", (abs_path,)).fetchone()
         if existing and existing["hash"] == h and not title and not summary and not tags:
-            print(f"  ✓ Unchanged, skipped: {abs_path}")
+            # print(f"Unchanged, skipped: {abs_path}")
             return
 
         content = file_path.read_text(encoding="utf-8")
-        wc = len(content.split())
+        size = len(content)
         if not existing:
             conn.execute(
-                """INSERT INTO docs (path, title, content, summary, word_count, source, hash)
+                """INSERT INTO docs (path, title, content, summary, size, source, hash)
                    VALUES (?, ?, ?, ?, ?, ?, ?)""",
-                (abs_path, title, content, summary, wc, source or abs_path, h),
+                (abs_path, title, content, summary, size, source or abs_path, h),
             )
             doc_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
             action = "new"
         else:
             doc_id = existing["id"]
             conn.execute(
-                """UPDATE docs SET title=?, content=?, summary=?, word_count=?, source=?, hash=?,
+                """UPDATE docs SET title=?, content=?, summary=?, size=?, source=?, hash=?,
                    updated_at=datetime('now') WHERE path=?""",
-                (title, content, summary, wc, source or abs_path, h, abs_path),
+                (title, content, summary, size, source or abs_path, h, abs_path),
             )
             action = "updated"
 
-        # Add & normalize tags
-        tag_list = _normalize_tags(tags or [])
-        for tag in tag_list:
+        for tag in tags or []:
             conn.execute(
                 """INSERT OR IGNORE INTO tags (doc_id, tag) VALUES (?, ?)""", (doc_id, tag)
             )
 
         conn.commit()
-        print(f"  ✓ Indexed: {action} {abs_path}")
+        # print(f"  ✓ Indexed: {action} {abs_path}")
 
 
 # ── Search ────────────────────────────────────────────────────────
@@ -169,7 +167,7 @@ def search(
         sql = """
             SELECT d.id, d.path, d.source, d.title,
                    snippet(docs_fts, -1, '\n', '', '...', 100) AS snippet,
-                   d.summary, d.word_count, d.updated_at,
+                   d.summary, d.size, d.updated_at,
                    bm25(docs_fts) AS relevance,
                    (
                        SELECT GROUP_CONCAT(tag, ', ')
@@ -200,6 +198,7 @@ def search(
                 "title": str(r["title"]),
                 "updated_at": str(r["updated_at"]),
                 "snippet": str(r["snippet"]),
+                "total_size": str(r["size"]),
                 "tags": r["tags"].split(", ") if r["tags"] else [],
             }
             for r in rows
@@ -240,7 +239,7 @@ def info(file_path: Path, index_path: Path) -> dict:
             "source": doc["source"],
             "title": doc["title"],
             "summary": doc["summary"],
-            "size": doc["word_count"],
+            "total_size": doc["size"],
             "tags": tags,
         }
 
@@ -429,12 +428,13 @@ Examples:
         file_path = _resolve_file(args.file)
         obj = info(file_path, index_path=index_path)
         if args.text:
-            print(f"\n  File: {obj['path']}")
+            print(f"\n")
+            print(f"    File: {obj['path']}")
             print(f"  Source: {obj['source']}")
-            print(f"  Title: {obj['title']}")
-            print(f"  Summary: {obj['summary']}")
-            print(f"  Size: {obj['size']} words")
-            print(f"  Tags: {', '.join(obj['tags']) if obj['tags'] else '—'}\n")
+            print(f"   Title: {obj['title']}")
+            print(f" Summary: {obj['summary']}")
+            print(f"    Size: {obj['total_size']} characters")
+            print(f"    Tags: {', '.join(obj['tags']) if obj['tags'] else '—'}\n")
         else:
             print(json.dumps(obj, indent=2))
 

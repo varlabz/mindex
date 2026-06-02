@@ -8,6 +8,7 @@ from .mindex import (
     read_file,
     delete_file,
     _normalize_tags,
+    _parse_tags,
     _db,
 )
 
@@ -20,5 +21,6 @@ __all__ = [
     "read_file",
     "delete_file",
     "_normalize_tags",
+    "_parse_tags",
     "_db",
 ]

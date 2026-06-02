@@ -15,7 +15,6 @@ import hashlib
 import os
 import argparse
 import json
-import sys
 from pathlib import Path
 
 DB_FILE = ".mindex.sqlite"  # index file stored in vault directory
@@ -128,7 +127,6 @@ def add_file(
                 (abs_path, title, content, summary, size, source or abs_path, h),
             )
             doc_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
-            action = "new"
         else:
             doc_id = existing["id"]
             conn.execute(
@@ -136,9 +134,8 @@ def add_file(
                    updated_at=datetime('now') WHERE path=?""",
                 (title, content, summary, size, source or abs_path, h, abs_path),
             )
-            action = "updated"
 
-        for tag in tags or []:
+        for tag in _normalize_tags(tags) if tags else []:
             conn.execute(
                 """INSERT OR IGNORE INTO tags (doc_id, tag) VALUES (?, ?)""", (doc_id, tag)
             )
@@ -151,11 +148,17 @@ def add_file(
 
 
 def search(
-    query: str, index_path: Path, limit: int = 10, file_path: Path | None = None
+    query: str,
+    index_path: Path,
+    limit: int = 10,
+    file_path: Path | None = None,
+    tags: list[str] | None = None,
 ) -> list[dict]:
     """Search indexed markdown files with FTS5 ranking (includes tags).
 
     If file_path is provided, only search within that file.
+    If tags is provided, only search in files that have all the given tags.
+    Tag filtering is case-insensitive.
     Returns list of dicts with keys: path, title, snippet, tags
     """
     with _db(index_path) as conn:
@@ -179,7 +182,7 @@ def search(
             WHERE docs_fts MATCH ?
         """
 
-        params = [query]
+        params: list = [query]
 
         # Add file filter if specified
         if file_path:
@@ -187,8 +190,20 @@ def search(
             sql += " AND d.path = ?"
             params.append(abs_path)
 
+        # Add tag filter if specified (case-insensitive)
+        if tags:
+            placeholders = ",".join("?" * len(tags))
+            tag_filter = (
+                f" AND d.id IN (SELECT doc_id FROM tags WHERE LOWER(tag) "
+                f"IN ({placeholders}) GROUP BY doc_id "
+                f"HAVING COUNT(DISTINCT tag) = ?)"
+            )
+            sql += tag_filter
+            params.extend([t.lower() for t in tags])
+            params.append(len(tags))
+
         sql += " ORDER BY relevance LIMIT ?"
-        params.append(str(limit))
+        params.append(limit)
 
         rows = conn.execute(sql, params).fetchall()
         return [
@@ -315,6 +330,14 @@ def _normalize_tags(tags: list[str]) -> list[str]:
     return result
 
 
+def _parse_tags(tags: list[str] | None) -> list[str] | None:
+    """Parse and normalize tags from command line arguments (space or comma separated)."""
+    if not tags:
+        return None
+    tag_list = [x.strip() for t in tags for x in t.replace(",", " ").split() if x.strip()]
+    return _normalize_tags(tag_list)
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Markdown Wiki Indexer — MD files + SQLite FTS5 search",
@@ -337,7 +360,12 @@ Examples:
     )
 
     # Top-level --index option
-    parser.add_argument("--index", "-i", required=True, help="Index directory (default: current dir)", )
+    parser.add_argument(
+        "--index",
+        "-i",
+        required=True,
+        help="Index directory (default: current dir)",
+    )
 
     sub = parser.add_subparsers(dest="command", help="Command to run")
 
@@ -356,6 +384,12 @@ Examples:
     p_search.add_argument("query", help="Search query (FTS5 syntax)")
     p_search.add_argument("--limit", "-l", type=int, default=10, help="Max results")
     p_search.add_argument("--file", "--path", help="Restrict search to a specific file")
+    p_search.add_argument(
+        "--tags",
+        "-t",
+        nargs="+",
+        help="Filter by tags (space or comma separated)",
+    )
     p_search.add_argument("--text", action="store_true", help="Output as text instead of JSON")
 
     # tags
@@ -384,22 +418,17 @@ Examples:
 
     # can use ~index_dir to specify different directory for index file
     index_path = Path(os.path.expanduser(args.index))
-    if not index_path.exists(): raise ValueError(f"Index directory does not exist: {index_path}")
+    if not index_path.exists():
+        raise ValueError(f"Index directory does not exist: {index_path}")
 
     cmd = args.command
 
     if cmd == "add":
         file_path = _resolve_file(args.file)
-        # do split by comma first to allow both space and comma separated tags
-        # check if split tags contain spaces, if so, split by space as well
-        tag_list = [x.strip() for t in args.tags or [] for x in t.split(",") if x.strip()]
-        if any(" " in tag for tag in tag_list):
-            tag_list = [x.strip() for tag in tag_list for x in tag.split(" ") if x.strip()]
-        normalized_tags = _normalize_tags(tag_list)
         add_file(
             file_path,
             index_path=index_path,
-            tags=normalized_tags,
+            tags=_parse_tags(args.tags),
             title=args.title,
             summary=args.summary,
             source=args.source,
@@ -411,7 +440,14 @@ Examples:
 
     elif cmd == "search":
         file_arg = _resolve_file(args.file) if args.file else None
-        results = search(args.query, index_path=index_path, limit=args.limit, file_path=file_arg)
+        tag_list = _parse_tags(args.tags)
+        results = search(
+            args.query,
+            index_path=index_path,
+            limit=args.limit,
+            file_path=file_arg,
+            tags=tag_list,
+        )
         output = (
             _format_search_results_text(results)
             if args.text
@@ -433,7 +469,7 @@ Examples:
         file_path = _resolve_file(args.file)
         obj = info(file_path, index_path=index_path)
         if args.text:
-            print(f"\n")
+            print("\n")
             print(f"    File: {obj['path']}")
             print(f"  Source: {obj['source']}")
             print(f"   Title: {obj['title']}")

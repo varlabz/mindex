@@ -35,7 +35,7 @@ class TestCLIAdd:
         """Test adding a file with basic metadata."""
         result = subprocess.run(
             [
-                "uv", "run", "mindex/mindex.py",
+                "uv", "run", "src/mindex/mindex.py",
                 "--index", str(temp_workspace),
                 "add", str(temp_workspace / "python.md"),
                 "--title", "Python Guide",
@@ -51,7 +51,7 @@ class TestCLIAdd:
         """Test adding a file with comma-separated tags."""
         result = subprocess.run(
             [
-                "uv", "run", "mindex/mindex.py",
+                "uv", "run", "src/mindex/mindex.py",
                 "--index", str(temp_workspace),
                 "add", str(temp_workspace / "python.md"),
                 "--title", "Python Guide",
@@ -68,7 +68,7 @@ class TestCLIAdd:
         """Test adding a file with space-separated tags."""
         result = subprocess.run(
             [
-                "uv", "run", "mindex/mindex.py",
+                "uv", "run", "src/mindex/mindex.py",
                 "--index", str(temp_workspace),
                 "add", str(temp_workspace / "sqlite.md"),
                 "--title", "SQLite Guide",
@@ -85,7 +85,7 @@ class TestCLIAdd:
         """Test adding a file with custom source URL."""
         result = subprocess.run(
             [
-                "uv", "run", "mindex/mindex.py",
+                "uv", "run", "src/mindex/mindex.py",
                 "--index", str(temp_workspace),
                 "add", str(temp_workspace / "tutorial.md"),
                 "--title", "Tutorial",
@@ -108,7 +108,7 @@ class TestCLISearch:
         # Add files to index
         subprocess.run(
             [
-                "uv", "run", "mindex/mindex.py",
+                "uv", "run", "src/mindex/mindex.py",
                 "--index", str(temp_workspace),
                 "add", str(temp_workspace / "python.md"),
                 "--title", "Python Guide",
@@ -121,7 +121,7 @@ class TestCLISearch:
         
         subprocess.run(
             [
-                "uv", "run", "mindex/mindex.py",
+                "uv", "run", "src/mindex/mindex.py",
                 "--index", str(temp_workspace),
                 "add", str(temp_workspace / "sqlite.md"),
                 "--title", "SQLite Database",
@@ -134,7 +134,7 @@ class TestCLISearch:
         
         subprocess.run(
             [
-                "uv", "run", "mindex/mindex.py",
+                "uv", "run", "src/mindex/mindex.py",
                 "--index", str(temp_workspace),
                 "add", str(temp_workspace / "tutorial.md"),
                 "--title", "Tutorial",
@@ -151,7 +151,7 @@ class TestCLISearch:
         """Test basic search without filters."""
         result = subprocess.run(
             [
-                "uv", "run", "mindex/mindex.py",
+                "uv", "run", "src/mindex/mindex.py",
                 "--index", str(indexed_workspace),
                 "search", "guide"
             ],
@@ -167,7 +167,7 @@ class TestCLISearch:
         """Test search with single tag filter."""
         result = subprocess.run(
             [
-                "uv", "run", "mindex/mindex.py",
+                "uv", "run", "src/mindex/mindex.py",
                 "--index", str(indexed_workspace),
                 "search", "guide",
                 "--tags", "python"
@@ -186,7 +186,7 @@ class TestCLISearch:
         """Test search with comma-separated tags."""
         result = subprocess.run(
             [
-                "uv", "run", "mindex/mindex.py",
+                "uv", "run", "src/mindex/mindex.py",
                 "--index", str(indexed_workspace),
                 "search", "tutorial",
                 "--tags", "python,sqlite"
@@ -206,7 +206,7 @@ class TestCLISearch:
         """Test search with space-separated tags."""
         result = subprocess.run(
             [
-                "uv", "run", "mindex/mindex.py",
+                "uv", "run", "src/mindex/mindex.py",
                 "--index", str(indexed_workspace),
                 "search", "tutorial",
                 "--tags", "python", "sqlite"
@@ -225,7 +225,7 @@ class TestCLISearch:
         """Test search with result limit."""
         result = subprocess.run(
             [
-                "uv", "run", "mindex/mindex.py",
+                "uv", "run", "src/mindex/mindex.py",
                 "--index", str(indexed_workspace),
                 "search", "guide",
                 "--limit", "1"
@@ -242,7 +242,7 @@ class TestCLISearch:
         """Test search with text output format."""
         result = subprocess.run(
             [
-                "uv", "run", "mindex/mindex.py",
+                "uv", "run", "src/mindex/mindex.py",
                 "--index", str(indexed_workspace),
                 "search", "guide",
                 "--text"
@@ -259,7 +259,7 @@ class TestCLISearch:
         """Test search within specific file."""
         result = subprocess.run(
             [
-                "uv", "run", "mindex/mindex.py",
+                "uv", "run", "src/mindex/mindex.py",
                 "--index", str(indexed_workspace),
                 "search", "programming",
                 "--file", str(indexed_workspace / "python.md")
@@ -282,7 +282,7 @@ class TestCLITags:
         # Add files with tags
         subprocess.run(
             [
-                "uv", "run", "mindex/mindex.py",
+                "uv", "run", "src/mindex/mindex.py",
                 "--index", str(temp_workspace),
                 "add", str(temp_workspace / "python.md"),
                 "--title", "Python",
@@ -295,7 +295,7 @@ class TestCLITags:
         
         subprocess.run(
             [
-                "uv", "run", "mindex/mindex.py",
+                "uv", "run", "src/mindex/mindex.py",
                 "--index", str(temp_workspace),
                 "add", str(temp_workspace / "sqlite.md"),
                 "--title", "SQLite",
@@ -309,7 +309,7 @@ class TestCLITags:
         # List tags
         result = subprocess.run(
             [
-                "uv", "run", "mindex/mindex.py",
+                "uv", "run", "src/mindex/mindex.py",
                 "--index", str(temp_workspace),
                 "tags"
             ],
@@ -333,7 +333,7 @@ class TestCLIInfo:
         # Add file
         subprocess.run(
             [
-                "uv", "run", "mindex/mindex.py",
+                "uv", "run", "src/mindex/mindex.py",
                 "--index", str(temp_workspace),
                 "add", str(temp_workspace / "python.md"),
                 "--title", "Python Guide",
@@ -347,7 +347,7 @@ class TestCLIInfo:
         # Get info (JSON output is default)
         result = subprocess.run(
             [
-                "uv", "run", "mindex/mindex.py",
+                "uv", "run", "src/mindex/mindex.py",
                 "--index", str(temp_workspace),
                 "info", str(temp_workspace / "python.md")
             ],
@@ -365,7 +365,7 @@ class TestCLIInfo:
         """Test getting file info in text format."""
         subprocess.run(
             [
-                "uv", "run", "mindex/mindex.py",
+                "uv", "run", "src/mindex/mindex.py",
                 "--index", str(temp_workspace),
                 "add", str(temp_workspace / "python.md"),
                 "--title", "Python Guide",
@@ -378,7 +378,7 @@ class TestCLIInfo:
         
         result = subprocess.run(
             [
-                "uv", "run", "mindex/mindex.py",
+                "uv", "run", "src/mindex/mindex.py",
                 "--index", str(temp_workspace),
                 "info", str(temp_workspace / "python.md"),
                 "--text"
@@ -400,7 +400,7 @@ class TestCLIDelete:
         # Add file
         subprocess.run(
             [
-                "uv", "run", "mindex/mindex.py",
+                "uv", "run", "src/mindex/mindex.py",
                 "--index", str(temp_workspace),
                 "add", str(temp_workspace / "python.md"),
                 "--title", "Python",
@@ -413,7 +413,7 @@ class TestCLIDelete:
         # Delete file
         result = subprocess.run(
             [
-                "uv", "run", "mindex/mindex.py",
+                "uv", "run", "src/mindex/mindex.py",
                 "--index", str(temp_workspace),
                 "rm", str(temp_workspace / "python.md")
             ],
@@ -426,7 +426,7 @@ class TestCLIDelete:
         # Verify file is deleted (info should fail)
         result = subprocess.run(
             [
-                "uv", "run", "mindex/mindex.py",
+                "uv", "run", "src/mindex/mindex.py",
                 "--index", str(temp_workspace),
                 "info", str(temp_workspace / "python.md")
             ],
@@ -445,7 +445,7 @@ class TestCLIRead:
         # Add file
         subprocess.run(
             [
-                "uv", "run", "mindex/mindex.py",
+                "uv", "run", "src/mindex/mindex.py",
                 "--index", str(temp_workspace),
                 "add", str(temp_workspace / "python.md"),
                 "--title", "Python",
@@ -458,7 +458,7 @@ class TestCLIRead:
         # Read file
         result = subprocess.run(
             [
-                "uv", "run", "mindex/mindex.py",
+                "uv", "run", "src/mindex/mindex.py",
                 "--index", str(temp_workspace),
                 "read", str(temp_workspace / "python.md")
             ],
@@ -473,7 +473,7 @@ class TestCLIRead:
         """Test reading file with position and size limits."""
         subprocess.run(
             [
-                "uv", "run", "mindex/mindex.py",
+                "uv", "run", "src/mindex/mindex.py",
                 "--index", str(temp_workspace),
                 "add", str(temp_workspace / "python.md"),
                 "--title", "Python",
@@ -485,7 +485,7 @@ class TestCLIRead:
         
         result = subprocess.run(
             [
-                "uv", "run", "mindex/mindex.py",
+                "uv", "run", "src/mindex/mindex.py",
                 "--index", str(temp_workspace),
                 "read", str(temp_workspace / "python.md"),
                 "--position", "0",

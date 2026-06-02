@@ -57,10 +57,10 @@ mindex-cli = "mindex.mindex:main"
 mindex = "mindex.mindex:main"
 
 [tool.setuptools]
-package-dir = {"" = "."}
+package-dir = {"" = "src"}
 
-[tool.setuptools.packages]
-find = {}
+[tool.setuptools.packages.find]
+where = ["src"]
 
 [tool.black]
 line-length = 100
@@ -93,7 +93,7 @@ exclude = [
 ]
 
 [tool.pytest.ini_options]
-testpaths = ["tests"]
+testpaths = ["src/tests"]
 python_files = ["test_*.py", "*_test.py"]
 addopts = "-v --tb=short"
 

@@ -167,8 +167,8 @@ def search(
             raise ValueError("Index is empty. Add files first.")
 
         sql = """
-            SELECT d.id, d.path, d.title,
-                   snippet(docs_fts, -1, '', '', '...', 100) AS snippet,
+            SELECT d.id, d.path, d.source, d.title,
+                   snippet(docs_fts, -1, '\n', '', '...', 100) AS snippet,
                    d.summary, d.word_count, d.updated_at,
                    bm25(docs_fts) AS relevance,
                    (
@@ -196,7 +196,9 @@ def search(
         return [
             {
                 "path": str(r["path"]),
+                "source": str(r["source"]),
                 "title": str(r["title"]),
+                "updated_at": str(r["updated_at"]),
                 "snippet": str(r["snippet"]),
                 "tags": r["tags"].split(", ") if r["tags"] else [],
             }
@@ -354,9 +356,7 @@ Examples:
     p_search.add_argument("query", help="Search query (FTS5 syntax)")
     p_search.add_argument("--limit", "-l", type=int, default=10, help="Max results")
     p_search.add_argument("--file", "--path", help="Restrict search to a specific file")
-    p_search_fmt = p_search.add_mutually_exclusive_group()
-    p_search_fmt.add_argument("--json", action="store_true", help="Output as JSON")
-    p_search_fmt.add_argument("--text", action="store_true", help="Output as text")
+    p_search.add_argument("--text", action="store_true", help="Output as text instead of JSON")
 
     # tags
     sub.add_parser("tags", help="List all tags")
@@ -364,9 +364,7 @@ Examples:
     # info
     p_info = sub.add_parser("info", help="Show file details")
     p_info.add_argument("file", help="Markdown file path")
-    p_info_fmt = p_info.add_mutually_exclusive_group()
-    p_info_fmt.add_argument("--json", action="store_true", help="Output as JSON")
-    p_info_fmt.add_argument("--text", action="store_true", help="Output as text")
+    p_info.add_argument("--text", action="store_true", help="Output as text instead of JSON")
 
     # show
     p_show = sub.add_parser("show", help="Show file content from position")
@@ -412,9 +410,9 @@ Examples:
         file_arg = _resolve_file(args.file) if args.file else None
         results = search(args.query, index_path=index_path, limit=args.limit, file_path=file_arg)
         output = (
-            _format_search_results_json(results)
-            if args.json
-            else _format_search_results_text(results)
+            _format_search_results_text(results)
+            if args.text
+            else _format_search_results_json(results)
         )
         print(output)
 
@@ -431,23 +429,16 @@ Examples:
     elif cmd == "info":
         file_path = _resolve_file(args.file)
         obj = info(file_path, index_path=index_path)
-        if args.json:
-            print(json.dumps(obj, indent=2))
-        else:
+        if args.text:
             print(f"\n  File: {obj['path']}")
             print(f"  Source: {obj['source']}")
             print(f"  Title: {obj['title']}")
             print(f"  Summary: {obj['summary']}")
             print(f"  Size: {obj['size']} words")
             print(f"  Tags: {', '.join(obj['tags']) if obj['tags'] else '—'}\n")
+        else:
+            print(json.dumps(obj, indent=2))
 
 
 if __name__ == "__main__":
-    try:
-        main()
-    except ValueError as e:
-        print(f"  ✗ Error: {e}", file=sys.stderr)
-        sys.exit(1)
-    except Exception as e:
-        print(f"  ✗ Unexpected error: {e}", file=sys.stderr)
-        sys.exit(1)
+    main()

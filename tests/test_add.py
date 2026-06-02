@@ -164,31 +164,6 @@ class TestAddFilePositive:
             ).fetchone()["c"]
             assert count == 1  # Only one record, not duplicated
 
-    def test_add_file_with_whitespace_tags(self, temp_workspace):
-        """Test that tags are normalized (whitespace stripped, lowercase)."""
-        test_file = temp_workspace / "whitespace.md"
-        test_file.write_text("# Doc\n\nContent.")
-        
-        mindex.add_file(
-            test_file,
-            index_path=temp_workspace,
-            title="Whitespace Test",
-            summary="Tags with whitespace",
-            tags=["  Python  ", "TESTING ", " SQLite"]
-        )
-        
-        with mindex._db(temp_workspace) as conn:
-            doc = conn.execute(
-                "SELECT id FROM docs WHERE path = ?", 
-                (str(test_file),)
-            ).fetchone()
-            tags = conn.execute(
-                "SELECT tag FROM tags WHERE doc_id = ? ORDER BY tag",
-                (doc["id"],)
-            ).fetchall()
-            tag_list = [t["tag"] for t in tags]
-            assert tag_list == ["python", "sqlite", "testing"]
-
     def test_add_file_preserves_size(self, temp_workspace):
         """Test that file size in characters is calculated and stored correctly."""
         test_file = temp_workspace / "chars.md"

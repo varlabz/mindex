@@ -389,7 +389,11 @@ Examples:
 
     if cmd == "add":
         file_path = _resolve_file(args.file)
+        # do split by comma first to allow both space and comma separated tags
+        # check if split tags contain spaces, if so, split by space as well
         tag_list = [x.strip() for t in args.tags or [] for x in t.split(",") if x.strip()]
+        if any(" " in tag for tag in tag_list):
+            tag_list = [x.strip() for tag in tag_list for x in tag.split(" ") if x.strip()]
         normalized_tags = _normalize_tags(tag_list)
         add_file(
             file_path,

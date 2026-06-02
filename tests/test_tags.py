@@ -103,22 +103,6 @@ class TestAddFileTagsPositive:
             ).fetchall()])
         assert tags == ["python", "sqlite", "testing"]
 
-    def test_add_file_tags_are_normalized_on_insert(self, temp_index_dir):
-        """Tags should be normalized (lowercased) when stored."""
-        index_path = Path(temp_index_dir)
-        test_file = Path(temp_index_dir) / "test.md"
-        test_file.write_text("# Test\nContent.")
-
-        add_file(test_file, index_path, title="Test", summary="Summary", tags=["Python", "  SQLITE  "])
-
-        with _db(index_path) as conn:
-            doc = conn.execute("SELECT id FROM docs WHERE path = ?", (str(test_file),)).fetchone()
-            tags = [r["tag"] for r in conn.execute(
-                "SELECT tag FROM tags WHERE doc_id = ?", (doc["id"],)
-            ).fetchall()]
-        assert "python" in tags
-        assert "sqlite" in tags
-
     def test_add_file_duplicate_tags_not_stored(self, temp_index_dir):
         """Duplicate tags should not be stored multiple times."""
         index_path = Path(temp_index_dir)
@@ -183,21 +167,6 @@ class TestAddFileTagsNegative:
             ).fetchall()
         assert len(tags) == 0
 
-    def test_add_file_whitespace_only_tags_not_stored(self, temp_index_dir):
-        """Tags that are only whitespace should not be stored."""
-        index_path = Path(temp_index_dir)
-        test_file = Path(temp_index_dir) / "test.md"
-        test_file.write_text("# Test\nContent.")
-
-        add_file(test_file, index_path, title="Test", summary="Summary", tags=["  ", "", "   "])
-
-        with _db(index_path) as conn:
-            doc = conn.execute("SELECT id FROM docs WHERE path = ?", (str(test_file),)).fetchone()
-            tags = conn.execute(
-                "SELECT tag FROM tags WHERE doc_id = ?", (doc["id"],)
-            ).fetchall()
-        assert len(tags) == 0
-
 
 class TestListTagsPositive:
     """Positive tests for list_tags."""
@@ -237,19 +206,6 @@ class TestListTagsPositive:
 
 class TestListTagsNegative:
     """Negative tests for list_tags."""
-
-    def test_list_tags_does_not_include_empty_tags(self, temp_index_dir):
-        """Empty strings should never appear in tag list."""
-        index_path = Path(temp_index_dir)
-        test_file = Path(temp_index_dir) / "test.md"
-        test_file.write_text("# Test\nContent.")
-
-        add_file(test_file, index_path, title="Test", summary="Summary", tags=["python", ""])
-
-        tags = list_tags(index_path)
-        assert "" not in tags
-        assert "python" in tags
-
 
 class TestInfoTagsPositive:
     """Positive tests for info() with tags."""

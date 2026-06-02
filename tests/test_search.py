@@ -71,7 +71,6 @@ class TestSearchPositive:
         
         assert len(results) > 0
         assert results[0]['title'] == "Agent Memory"
-        assert 'relevance' in dict(results[0])
     
     def test_search_with_limit(self, temp_index_dir, temp_markdown_files):
         """Search with custom limit parameter."""
@@ -164,16 +163,15 @@ class TestSearchNegative:
         assert results is None or len(results) == 0
     
     def test_search_invalid_fts_syntax(self, temp_index_dir, temp_markdown_files):
-        """Invalid FTS5 syntax should return None (error caught)."""
+        """Invalid FTS5 syntax should raise sqlite3.OperationalError."""
         temp_dir, file1, file2, file3 = temp_markdown_files
         index_path = Path(temp_index_dir)
         
         add_file(file1, index_path, title="Agent Memory", summary="Memory patterns")
         
         # Invalid FTS5 syntax: unmatched quotes
-        results = search('memory "unmatched quote', index_path)
-        
-        assert results is None
+        with pytest.raises(sqlite3.OperationalError):
+            search('memory "unmatched quote', index_path)
     
     def test_search_nonexistent_file_path(self, temp_index_dir, temp_markdown_files):
         """Search restricted to non-existent file should return empty."""

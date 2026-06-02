@@ -18,23 +18,26 @@ import json
 import sys
 from pathlib import Path
 
-DB_PATH = "mindex.sqlite"       # index file stored in vault directory
+DB_FILE = "mindex.sqlite"  # index file stored in vault directory
 
 
 class _db:
     """Context-manager wrapper for sqlite3.Connection with auto-close."""
-    def __init__(self, index_dir: str = "."):
+
+    def __init__(self, index_dir: str | Path):
         self.conn = self.get_db(index_dir)
+
     def __enter__(self) -> sqlite3.Connection:
         return self.conn
+
     def __exit__(self, *exc) -> None:
         self.conn.close()
 
     @staticmethod
-    def get_db(index_dir: str = ".") -> sqlite3.Connection:
+    def get_db(index_dir: str | Path) -> sqlite3.Connection:
         index_path = Path(index_dir)
         index_path.mkdir(parents=True, exist_ok=True)
-        conn = sqlite3.connect(os.path.join(index_dir, DB_PATH))
+        conn = sqlite3.connect(os.path.join(index_dir, DB_FILE))
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA journal_mode=WAL")
         conn.execute("PRAGMA foreign_keys=ON")
@@ -92,7 +95,15 @@ CREATE INDEX IF NOT EXISTS idx_tags_doc ON tags(doc_id);
 
 # ── Add / Index Files ─────────────────────────────────────────────
 
-def add_file(file_path: Path, index_path: Path, tags: list[str] | None = None, title: str | None = None, summary: str | None = None, source: str | None = None):
+
+def add_file(
+    file_path: Path,
+    index_path: Path,
+    tags: list[str] | None = None,
+    title: str | None = None,
+    summary: str | None = None,
+    source: str | None = None,
+):
     """Add or update a single markdown file in the index."""
 
     def file_hash(path: Path) -> str:
@@ -103,9 +114,7 @@ def add_file(file_path: Path, index_path: Path, tags: list[str] | None = None, t
         h = file_hash(file_path)
 
         # Skip unchanged files unless custom title/summary/tags provided
-        existing = conn.execute(
-            "SELECT id, hash FROM docs WHERE path = ?", (abs_path,)
-        ).fetchone()
+        existing = conn.execute("SELECT id, hash FROM docs WHERE path = ?", (abs_path,)).fetchone()
         if existing and existing["hash"] == h and not title and not summary and not tags:
             print(f"  ✓ Unchanged, skipped: {abs_path}")
             return
@@ -116,7 +125,7 @@ def add_file(file_path: Path, index_path: Path, tags: list[str] | None = None, t
             conn.execute(
                 """INSERT INTO docs (path, title, content, summary, word_count, source, hash)
                    VALUES (?, ?, ?, ?, ?, ?, ?)""",
-                (abs_path, title, content, summary, wc, source or abs_path, h)
+                (abs_path, title, content, summary, wc, source or abs_path, h),
             )
             doc_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
             action = "new"
@@ -125,7 +134,7 @@ def add_file(file_path: Path, index_path: Path, tags: list[str] | None = None, t
             conn.execute(
                 """UPDATE docs SET title=?, content=?, summary=?, word_count=?, source=?, hash=?,
                    updated_at=datetime('now') WHERE path=?""",
-                (title, content, summary, wc, source or abs_path, h, abs_path)
+                (title, content, summary, wc, source or abs_path, h, abs_path),
             )
             action = "updated"
 
@@ -133,8 +142,7 @@ def add_file(file_path: Path, index_path: Path, tags: list[str] | None = None, t
         tag_list = _normalize_tags(tags or [])
         for tag in tag_list:
             conn.execute(
-                """INSERT OR IGNORE INTO tags (doc_id, tag) VALUES (?, ?)""",
-                (doc_id, tag)
+                """INSERT OR IGNORE INTO tags (doc_id, tag) VALUES (?, ?)""", (doc_id, tag)
             )
 
         conn.commit()
@@ -143,48 +151,61 @@ def add_file(file_path: Path, index_path: Path, tags: list[str] | None = None, t
 
 # ── Search ────────────────────────────────────────────────────────
 
-def search(query: str, index_path: Path, limit: int = 10, file_path: Path | None = None) -> list[sqlite3.Row] | None:
+
+def search(
+    query: str, index_path: Path, limit: int = 10, file_path: Path | None = None
+) -> list[dict]:
     """Search indexed markdown files with FTS5 ranking (includes tags).
-    
+
     If file_path is provided, only search within that file.
+    Returns list of dicts with keys: path, title, snippet, tags
     """
     with _db(index_path) as conn:
         # Check if index is empty
         count = conn.execute("SELECT count(*) FROM docs").fetchone()[0]
-        if count == 0: raise ValueError("Index is empty. Add files first.")
+        if count == 0:
+            raise ValueError("Index is empty. Add files first.")
 
         sql = """
             SELECT d.id, d.path, d.title,
-                   snippet(docs_fts, -1, '', '', '...', 100) AS snippet,   
+                   snippet(docs_fts, -1, '', '', '...', 100) AS snippet,
                    d.summary, d.word_count, d.updated_at,
-                   bm25(docs_fts) AS relevance
+                   bm25(docs_fts) AS relevance,
+                   (
+                       SELECT GROUP_CONCAT(tag, ', ')
+                       FROM tags
+                       WHERE doc_id = d.id
+                   ) AS tags
             FROM docs_fts f
             JOIN docs d ON d.id = f.rowid
             WHERE docs_fts MATCH ?
         """
-        
+
         params = [query]
-        
+
         # Add file filter if specified
         if file_path:
             abs_path = str(file_path.absolute())
             sql += " AND d.path = ?"
             params.append(abs_path)
-        
+
         sql += " ORDER BY relevance LIMIT ?"
-        params.append(limit)
+        params.append(str(limit))
 
-        try:
-            rows = conn.execute(sql, params).fetchall()
-        except sqlite3.OperationalError as e:
-            print(f"  ✗ Search error: {e}", file=sys.stderr)
-            print("     Try quoting your query or simplifying it.", file=sys.stderr)
-            return
-
-        return rows
+        rows = conn.execute(sql, params).fetchall()
+        return [
+            {
+                "path": str(r["path"]),
+                "title": str(r["title"]),
+                "snippet": str(r["snippet"]),
+                "tags": r["tags"].split(", ") if r["tags"] else [],
+            }
+            for r in rows
+        ]
 
 
 # ── Tags ──────────────────────────────────────────────────────────
+
 
 def list_tags(index_path: Path) -> set[str]:
     """List all unique tag names."""
@@ -204,11 +225,13 @@ def info(file_path: Path, index_path: Path) -> dict:
     with _db(index_path) as conn:
         doc = conn.execute("SELECT * FROM docs WHERE path = ?", (abs_path,)).fetchone()
 
-        if not doc: raise ValueError(f"  ✗ File not indexed: {file_path}")
+        if not doc:
+            raise ValueError(f"  ✗ File not indexed: {file_path}")
 
-        tags = [r["tag"] for r in conn.execute(
-            "SELECT tag FROM tags WHERE doc_id = ?", (doc["id"],)
-        ).fetchall()]
+        tags = [
+            r["tag"]
+            for r in conn.execute("SELECT tag FROM tags WHERE doc_id = ?", (doc["id"],)).fetchall()
+        ]
 
         return {
             "path": doc["path"],
@@ -225,10 +248,11 @@ def show_file(file_path: Path, index_path: Path, position: int = 0, size: int | 
     abs_path = str(file_path)
     with _db(index_path) as conn:
         doc = conn.execute("SELECT content FROM docs WHERE path = ?", (abs_path,)).fetchone()
-        if not doc: raise ValueError(f"File not indexed: {file_path}")
+        if not doc:
+            raise ValueError(f"File not indexed: {file_path}")
 
-        content = doc["content"]
-        return content[position:position + size] if size else content[position:]
+        content = str(doc["content"])
+        return content[position : position + size] if size else content[position:]
 
 
 def delete_file(file_path: Path, index_path: Path):
@@ -236,38 +260,45 @@ def delete_file(file_path: Path, index_path: Path):
     abs_path = str(file_path)
     with _db(index_path) as conn:
         doc = conn.execute("SELECT id, title FROM docs WHERE path = ?", (abs_path,)).fetchone()
-        
-        if not doc: raise ValueError(f"  ✗ File not indexed: {file_path}")
-        
+
+        if not doc:
+            raise ValueError(f"  ✗ File not indexed: {file_path}")
+
         conn.execute("DELETE FROM docs WHERE id = ?", (doc["id"],))
         conn.commit()
-        print(f"  ✓ Deleted: {doc['title']} ({abs_path})")
 
 
 # ── CLI ───────────────────────────────────────────────────────────
+
 
 def _resolve_file(file: str) -> Path:
     """Resolve a file argument to absolute Path. Try as-is first, then from current directory."""
     path = Path(file)
     # Try the path as given
-    if path.exists(): return path.resolve()
-  
+    if path.exists():
+        return path.resolve()
+
     raise ValueError(f"Not found: {file}")
 
-def _format_search_results_text(rows: list[sqlite3.Row]) -> str:
-    """Format search results as plain text."""
-    if not rows:
-        print("  ✗ No results", file=sys.stderr)
-        return ""
-    output = f"\n  Results ({len(rows)} found):\n"
-    for i, r in enumerate(rows, 1):
-        output += f"  {i}. Path: {r['path']}\n     Title: {r['title']}\n     Snippet: {r['snippet']}\n\n"
+
+def _format_search_results_text(rows: list[dict]) -> str:
+    """Format search results as indented key-value text."""
+    output = ""
+    for r in rows:
+        for key, value in r.items():
+            if key == "tags":
+                if value:
+                    output += f"{key}: {', '.join(value)}\n"
+            else:
+                output += f"{key}: {value}\n"
+        output += "\n"
+        output += "-" * 20 + "\n"
     return output
 
 
-def _format_search_results_json(rows: list[sqlite3.Row]) -> str:
+def _format_search_results_json(rows: list[dict]) -> str:
     """Format search results as JSON."""
-    return json.dumps([{"path": r["path"], "title": r["title"], "snippet": r["snippet"]} for r in rows], indent=2)
+    return json.dumps(rows, indent=2)
 
 
 def _normalize_tags(tags: list[str]) -> list[str]:
@@ -280,6 +311,7 @@ def _normalize_tags(tags: list[str]) -> list[str]:
             seen.add(t)
             result.append(t)
     return result
+
 
 def main():
     parser = argparse.ArgumentParser(
@@ -299,7 +331,7 @@ Examples:
   mindex.py info articles/notes.md
   mindex.py info articles/notes.md --json
   mindex.py rm articles/notes.md
-        """
+        """,
     )
 
     # Top-level --index option
@@ -310,7 +342,9 @@ Examples:
     # add
     p_add = sub.add_parser("add", help="Add markdown file to index")
     p_add.add_argument("file", help="Markdown file to add. ")
-    p_add.add_argument("--tags", "-t", nargs="+", help="Tags to assign to the file (space or comma separated)")
+    p_add.add_argument(
+        "--tags", "-t", nargs="+", help="Tags to assign to the file (space or comma separated)"
+    )
     p_add.add_argument("--title", "-T", help="Custom title for the file (required)")
     p_add.add_argument("--summary", "-S", help="Custom summary text (required)")
     p_add.add_argument("--source", "-s", help="Source URL or reference (default: full file path)")
@@ -325,7 +359,7 @@ Examples:
     p_search_fmt.add_argument("--text", action="store_true", help="Output as text")
 
     # tags
-    p_tags = sub.add_parser("tags", help="List all tags")
+    sub.add_parser("tags", help="List all tags")
 
     # info
     p_info = sub.add_parser("info", help="Show file details")
@@ -350,9 +384,10 @@ Examples:
         parser.print_help()
         return
 
-    # can use ~index_dir to specify a different directory for the index file, defaults to current dir
+    # can use ~index_dir to specify different directory for index file
     index_path = Path(os.path.expanduser(args.index))
-    if not index_path.exists(): index_path.mkdir(parents=True)
+    if not index_path.exists():
+        index_path.mkdir(parents=True)
 
     cmd = args.command
 
@@ -360,7 +395,14 @@ Examples:
         file_path = _resolve_file(args.file)
         tag_list = [x.strip() for t in args.tags or [] for x in t.split(",") if x.strip()]
         normalized_tags = _normalize_tags(tag_list)
-        add_file(file_path, index_path=index_path, tags=normalized_tags, title=args.title, summary=args.summary, source=args.source)
+        add_file(
+            file_path,
+            index_path=index_path,
+            tags=normalized_tags,
+            title=args.title,
+            summary=args.summary,
+            source=args.source,
+        )
 
     elif cmd in ["rm", "delete"]:
         file_path = _resolve_file(args.file)
@@ -369,19 +411,21 @@ Examples:
     elif cmd == "search":
         file_arg = _resolve_file(args.file) if args.file else None
         results = search(args.query, index_path=index_path, limit=args.limit, file_path=file_arg)
-        if results:
-            output = _format_search_results_json(results) if args.json else _format_search_results_text(results)
-            if output:
-                print(output)
-        else:
-            print(f"  ✗ No results for: {args.query}", file=sys.stderr)
+        output = (
+            _format_search_results_json(results)
+            if args.json
+            else _format_search_results_text(results)
+        )
+        print(output)
 
     elif cmd == "tags":
         print("\n".join(list_tags(index_path=index_path)))
 
     elif cmd == "show":
         file_path = _resolve_file(args.file)
-        content = show_file(file_path, index_path=index_path, position=args.position, size=args.size)
+        content = show_file(
+            file_path, index_path=index_path, position=args.position, size=args.size
+        )
         print(content)
 
     elif cmd == "info":
@@ -399,4 +443,11 @@ Examples:
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except ValueError as e:
+        print(f"  ✗ Error: {e}", file=sys.stderr)
+        sys.exit(1)
+    except Exception as e:
+        print(f"  ✗ Unexpected error: {e}", file=sys.stderr)
+        sys.exit(1)

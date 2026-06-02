@@ -54,6 +54,7 @@ Issues = "https://github.com/yourusername/mindex/issues"
 
 [project.scripts]
 mindex-cli = "mindex.mindex:main"
+mindex = "mindex.mindex:main"
 
 [tool.setuptools]
 package-dir = {"" = "."}

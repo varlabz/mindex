@@ -1,216 +1,183 @@
 # mindex — Markdown Index
 
-A lightweight markdown indexing and full-text search system using SQLite FTS5.
+Lightweight markdown indexing and full-text search powered by SQLite FTS5.
 
 **Features:**
-- 📝 Index markdown files with metadata (title, summary, tags)
-- 🔍 Full-text search with BM25 ranking
-- 🏷️ Tag-based organization and filtering
-- 🔄 Hash-based change detection (incremental updates)
-- ⚡ Zero external dependencies (uses Python's built-in `sqlite3`)
-- 📦 Single SQLite database for everything
+- Index markdown files with metadata (titles, summaries, tags)
+- Full-text search with BM25 relevance ranking
+- Tag-based organization and filtering
+- Hash-based change detection for incremental updates
+- Zero dependencies beyond Python's standard library
+- Single SQLite database file
 
 ## Installation
 
-### From source
+### Run without installation
 ```bash
-git clone https://github.com/yourusername/mindex.git
-cd mindex
-pip install -e .
-```
-
-### With development dependencies
-```bash
-pip install -e ".[dev]"
+uvx --from git+https://github.com/varlabz/mindex mindex-cli
 ```
 
 ## Quick Start
 
-### 1. Add markdown files to the index
+### 1. Index a markdown file
 
 ```bash
-mindex add articles/sqlite.md \
+mindex-cli add articles/sqlite.md \
   --title "SQLite FTS5 Guide" \
-  --summary "A comprehensive guide to SQLite's full-text search capabilities"
+  --summary "Complete guide to SQLite's full-text search"
 ```
 
 ### 2. Search the index
 
 ```bash
-mindex search "full-text search"
+mindex-cli search "full-text search"
 ```
 
-### 3. Add tags to files
+### 3. Tag files
 
 ```bash
-mindex tags --add articles/sqlite.md sqlite,database,search
+mindex-cli add articles/sqlite.md --title "SQLite FTS5 Guide" --summary "Guide" --tags sqlite database search
 ```
 
-### 4. List all documents
+### 4. List all tags
 
 ```bash
-mindex list
-mindex list --tag sqlite
-mindex list --tags  # Show tags for each document
+mindex-cli tags
 ```
 
-### 5. View file details
+### 5. Show file details
 
 ```bash
-mindex info articles/sqlite.md
+mindex-cli info articles/sqlite.md
 ```
 
 ## Usage
 
 ### Commands
 
-#### `add` - Add or update a markdown file
+#### `add` - Index or update a markdown file
 
 ```bash
-mindex add <file.md> --title "Title" --summary "Summary" [--tags tag1 tag2] [--source URL]
+mindex-cli add <file.md> --title "Title" --summary "Summary" [--tags tag1 tag2] [--source URL]
 ```
 
 **Options:**
 - `--title, -T`: Document title (required)
-- `--summary, -S`: Short summary (required)
+- `--summary, -S`: Brief description (required)
 - `--tags, -t`: Space or comma-separated tags (optional)
-- `--source, -s`: Original source URL (optional, defaults to file path)
+- `--source, -s`: Source URL (optional, defaults to file path)
 
-#### `search` - Full-text search
+#### `search` - Search indexed content
 
 ```bash
-mindex search "query" [--limit 10] [--file path/to/file.md] [--json]
+mindex-cli search "query" [--limit 10] [--file path/to/file.md] [--json]
 ```
 
 **Options:**
-- `--limit, -l`: Maximum results (default: 10)
-- `--file, -f`: Restrict search to a specific file
-- `--json`: Output results as JSON (default: text)
+- `--limit, -l`: Maximum number of results (default: 10)
+- `--file`: Search within a specific file only
+- `--json`: Output as JSON instead of plain text
 
-#### `tags` - Manage tags
+#### `tags` - List all tags
 
 ```bash
-mindex tags --list                          # List all tags
-mindex tags --add file.md "tag1,tag2"      # Add tags
-mindex tags --remove file.md "tag1,tag2"   # Remove tags
+mindex-cli tags
 ```
 
-#### `list` - List indexed documents
+#### `show` - Display file content
 
 ```bash
-mindex list [--tag TAG] [--sort updated|title] [--tags]
+mindex-cli show <file.md> [--position 0] [--size 1000]
 ```
 
 **Options:**
-- `--tag, -t`: Filter by tag
-- `--sort, -s`: Sort by "updated" (default) or "title"
-- `--tags`: Show tags for each document
+- `--position, -p`: Start position in characters (default: 0)
+- `--size, -s`: Number of characters to show
 
-#### `info` - Show file details
+#### `info` - Display file metadata
 
 ```bash
-mindex info <file.md>
+mindex-cli info <file.md> [--json]
 ```
+
+**Options:**
+- `--json`: Output as JSON instead of plain text
 
 #### `rm` / `delete` - Remove file from index
 
 ```bash
-mindex rm <file.md>
+mindex-cli rm <file.md>
+mindex-cli delete <file.md>
 ```
 
 ### Global Options
 
 ```bash
-mindex --index_dir ~/my-wiki <command>
+mindex-cli --index ~/my-wiki <command>
 ```
 
-The default index directory is the current working directory. Use `--index_dir` to specify a custom location.
-
-## Python API
-
-```python
-from pathlib import Path
-from mindex import add_file, search, manage_tags
-
-index_path = Path(".")
-
-# Add a file
-add_file(
-    Path("articles/sqlite.md"),
-    index_path=index_path,
-    tags=["sqlite", "database"],
-    title="SQLite Guide",
-    summary="Learn SQLite FTS5"
-)
-
-# Search
-results = search("full-text search", index_path=index_path, limit=10)
-for row in results:
-    print(f"{row['title']}: {row['snippet']}")
-
-# Manage tags
-manage_tags(
-    Path("articles/sqlite.md"),
-    index_path=index_path,
-    add_tags=["important"]
-)
-```
+Defaults to current directory. Use `--index` (or `-i`) to specify a custom index location.
 
 ## How It Works
 
 ### Database Schema
 
-**docs** - Main document table:
+**docs** - Document metadata:
+- `id`: Row identifier (primary key)
 - `path`: Unique file path
+- `source`: Source URL or reference (defaults to path)
 - `title`: Document title
 - `content`: Full markdown content
-- `summary`: Short description
-- `word_count`: Number of words
-- `hash`: SHA-256 hash for change detection
+- `summary`: Brief description
+- `word_count`: Word count
+- `hash`: SHA-256 content hash for change detection
 - `created_at`, `updated_at`: Timestamps
 
-**docs_fts** - Virtual FTS5 table:
-- Enables full-text search across `title`, `content`, and `summary`
-- Uses BM25 ranking for relevance
+**docs_fts** - FTS5 virtual table:
+- Full-text search index covering `title`, `content`, and `summary`
+- BM25 relevance ranking
+- Linked to `docs` table via `content_rowid`
 
-**tags** - Tag association table:
-- Links documents to tags
-- Supports efficient tag-based filtering
+**tags** - Tag associations:
+- `doc_id`: Foreign key to docs.id
+- `tag`: Tag name
+- Many-to-many relationship between documents and tags
+- Primary key on (doc_id, tag)
 
 ### Change Detection
 
-Files are skipped during indexing if:
-- The file exists in the index
-- The SHA-256 hash matches (no changes)
-- No custom metadata is provided
+Files are skipped during indexing when:
+- File already exists in index
+- SHA-256 hash matches (content unchanged)
+- No new metadata provided
 
-This allows for fast incremental updates when re-running the indexer.
+Enables fast incremental re-indexing.
 
 ## Testing
 
-Run the test suite:
-
 ```bash
 pytest tests/ -v
-pytest tests/ --cov=mindex  # With coverage
+pytest tests/ --cov=mindex  # With coverage report
 ```
 
 ## Development
 
-### Setup development environment
+### Setup
 
 ```bash
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-pip install -e ".[dev]"
+git clone https://github.com/varlabz/mindex.git
+cd mindex
+uv venv
+source .venv/bin/activate  # Windows: .venv\Scripts\activate
+uv pip install -e ".[dev]"
 ```
 
-### Code quality
+### Linting
 
 ```bash
-black mindex/
-ruff check mindex/
-mypy mindex/
+uv run black mindex/
+uv run ruff check mindex/
+uv run mypy mindex/
 ```
 
 ## License
@@ -219,12 +186,8 @@ MIT License - see LICENSE file for details
 
 ## Contributing
 
-Contributions welcome! Please:
 1. Fork the repository
 2. Create a feature branch
-3. Write tests for new functionality
+3. Add tests for new features
 4. Submit a pull request
 
-## Author
-
-Your Name - [@yourusername](https://twitter.com/yourusername)

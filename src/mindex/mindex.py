@@ -167,9 +167,12 @@ def search(
         if count == 0:
             raise ValueError("Index is empty. Add files first.")
 
-        # if have file and tags throw error because they serve different purposes and combining them doesn't make sense
+        # if have file and tags throw error because they serve different purposes
+        # and combining them doesn't make sense
         if file_path and tags:
-            raise ValueError("Cannot use both --file and --tags filters in the same search command.")
+            raise ValueError(
+                "Cannot use both --file and --tags filters in the same search command."
+            )
 
         sql = """
             SELECT d.id, d.path, d.source, d.title,

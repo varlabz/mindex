@@ -94,14 +94,14 @@ class TestCLIErrors:
         assert "not indexed" in result.stderr or "Error" in result.stderr
     
     def test_show_nonexistent_file(self, temp_index_dir):
-        """Show command for nonexistent file should fail."""
-        result = run_cli("--index", temp_index_dir, "show", "/nonexistent/file.md")
+        """Read command for nonexistent file should fail."""
+        result = run_cli("--index", temp_index_dir, "read", "/nonexistent/file.md")
         assert result.returncode != 0
         assert "Not found" in result.stderr or "Error" in result.stderr
     
     def test_show_unindexed_file(self, temp_index_dir, temp_markdown_file):
-        """Show command for unindexed file should fail."""
+        """Read command for unindexed file should fail."""
         _, file = temp_markdown_file
-        result = run_cli("--index", temp_index_dir, "show", str(file))
+        result = run_cli("--index", temp_index_dir, "read", str(file))
         assert result.returncode != 0
         assert "not indexed" in result.stderr or "Error" in result.stderr

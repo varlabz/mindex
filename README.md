@@ -84,10 +84,10 @@ mindex-cli search "query" [--limit 10] [--file path/to/file.md] [--json]
 mindex-cli tags
 ```
 
-#### `show` - Display file content
+#### `read` - Display file content
 
 ```bash
-mindex-cli show <file.md> [--position 0] [--size 1000]
+mindex-cli read <file.md> [--position 0] [--size 1000]
 ```
 
 **Options:**

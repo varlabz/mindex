@@ -199,6 +199,7 @@ def search(
                 "updated_at": str(r["updated_at"]),
                 "snippet": str(r["snippet"]),
                 "total_size": str(r["size"]),
+                "relevance": r["relevance"],
                 "tags": r["tags"].split(", ") if r["tags"] else [],
             }
             for r in rows
@@ -244,8 +245,8 @@ def info(file_path: Path, index_path: Path) -> dict:
         }
 
 
-def show_file(file_path: Path, index_path: Path, position: int = 0, size: int | None = None) -> str:
-    """Show file content from position with optional size limit."""
+def read_file(file_path: Path, index_path: Path, position: int = 0, size: int | None = None) -> str:
+    """Read file content from position with optional size limit."""
     abs_path = str(file_path)
     with _db(index_path) as conn:
         doc = conn.execute("SELECT content FROM docs WHERE path = ?", (abs_path,)).fetchone()
@@ -365,11 +366,11 @@ Examples:
     p_info.add_argument("file", help="Markdown file path")
     p_info.add_argument("--text", action="store_true", help="Output as text instead of JSON")
 
-    # show
-    p_show = sub.add_parser("show", help="Show file content from position")
-    p_show.add_argument("file", help="Markdown file path")
-    p_show.add_argument("--position", "-p", type=int, default=0, help="Start position (default: 0)")
-    p_show.add_argument("--size", "-s", type=int, help="Number of characters to show")
+    # read
+    p_read = sub.add_parser("read", help="Show file content from position")
+    p_read.add_argument("file", help="Markdown file path")
+    p_read.add_argument("--position", "-p", type=int, default=0, help="Start position (default: 0)")
+    p_read.add_argument("--size", "-s", type=int, help="Number of characters to show")
 
     # rm/delete
     p_rm = sub.add_parser("rm", aliases=["delete"], help="Remove file from index")
@@ -421,9 +422,9 @@ Examples:
     elif cmd == "tags":
         print("\n".join(list_tags(index_path=index_path)))
 
-    elif cmd == "show":
+    elif cmd == "read":
         file_path = _resolve_file(args.file)
-        content = show_file(
+        content = read_file(
             file_path, index_path=index_path, position=args.position, size=args.size
         )
         print(content)

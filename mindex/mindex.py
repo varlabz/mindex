@@ -18,7 +18,7 @@ import json
 import sys
 from pathlib import Path
 
-DB_FILE = "mindex.sqlite"  # index file stored in vault directory
+DB_FILE = ".mindex.sqlite"  # index file stored in vault directory
 
 
 class _db:
@@ -337,7 +337,7 @@ Examples:
     )
 
     # Top-level --index option
-    parser.add_argument("--index", "-i", default=".", help="Index directory (default: current dir)")
+    parser.add_argument("--index", "-i", required=True, help="Index directory (default: current dir)", )
 
     sub = parser.add_subparsers(dest="command", help="Command to run")
 
@@ -384,8 +384,7 @@ Examples:
 
     # can use ~index_dir to specify different directory for index file
     index_path = Path(os.path.expanduser(args.index))
-    if not index_path.exists():
-        index_path.mkdir(parents=True)
+    if not index_path.exists(): raise ValueError(f"Index directory does not exist: {index_path}")
 
     cmd = args.command
 

@@ -167,6 +167,10 @@ def search(
         if count == 0:
             raise ValueError("Index is empty. Add files first.")
 
+        # if have file and tags throw error because they serve different purposes and combining them doesn't make sense
+        if file_path and tags:
+            raise ValueError("Cannot use both --file and --tags filters in the same search command.")
+
         sql = """
             SELECT d.id, d.path, d.source, d.title,
                    snippet(docs_fts, -1, '\n', '', '...', 100) AS snippet,
@@ -383,8 +387,9 @@ Examples:
     p_search = sub.add_parser("search", help="Search indexed files")
     p_search.add_argument("query", help="Search query (FTS5 syntax)")
     p_search.add_argument("--limit", "-l", type=int, default=10, help="Max results")
-    p_search.add_argument("--file", "--path", help="Restrict search to a specific file")
-    p_search.add_argument(
+    search_filter = p_search.add_mutually_exclusive_group()
+    search_filter.add_argument("--file", "--path", help="Restrict search to a specific file")
+    search_filter.add_argument(
         "--tags",
         "-t",
         nargs="+",

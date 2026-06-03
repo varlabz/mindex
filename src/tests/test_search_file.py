@@ -16,7 +16,7 @@ def test_search_file_single_match():
         results = search_file(index_dir, test_file, "fox")
 
         assert len(results) == 1
-        assert f"{MARK_START}fox{MARK_END}" in results[0].snippet
+        assert "fox" in results[0].snippet
         assert results[0].position == 16  # "The quick brown fox" -> fox starts at index 16
 
 
@@ -33,7 +33,7 @@ def test_search_file_multiple_matches():
 
         assert len(results) == 3
         for r in results:
-            assert f"{MARK_START}apple{MARK_END}" in r.snippet
+            assert "apple" in r.snippet
 
 
 def test_search_file_no_matches():
@@ -76,7 +76,7 @@ def test_search_file_multi_word_query():
         results = search_file(index_dir, test_file, "quick brown")
 
         assert len(results) >= 1
-        assert f"{MARK_START}quick brown{MARK_END}" in results[0].snippet
+        assert "quick brown" in results[0].snippet
 
 
 def test_search_file_snippet_contains_context():
@@ -168,8 +168,8 @@ class TestExtractSnippetsPositive:
         results = _extract_snippets(highlighted, limit=5)
 
         assert len(results) == 1
-        assert MARK_START in results[0].snippet
-        assert MARK_END in results[0].snippet
+        assert MARK_START not in results[0].snippet
+        assert MARK_END not in results[0].snippet
         assert "prefix" in results[0].snippet
         assert "suffix" in results[0].snippet
 
@@ -292,8 +292,10 @@ class TestExtractSnippetsPositive:
         results = _extract_snippets(highlighted, limit=5)
 
         assert len(results) == 1
-        # Snippet should start at or near the beginning
-        assert results[0].snippet.startswith(MARK_START)
+        # Snippet should start at the beginning (no leading context possible)
+        assert not results[0].snippet.startswith(" ")
+        assert "near start" in results[0].snippet
+        assert "rest of text" in results[0].snippet
 
     def test_snippet_truncated_at_end(self):
         """Test that snippet doesn't go past end of string."""
@@ -301,8 +303,9 @@ class TestExtractSnippetsPositive:
         results = _extract_snippets(highlighted, limit=5)
 
         assert len(results) == 1
-        # Snippet should end at the string boundary
-        assert results[0].snippet.endswith(MARK_END)
+        # Snippet should not contain markers (they are stripped)
+        assert MARK_END not in results[0].snippet
+        assert "near end" in results[0].snippet
 
     def test_large_limit_exceeds_matches(self):
         """Test that large limit doesn't cause errors when fewer matches exist."""

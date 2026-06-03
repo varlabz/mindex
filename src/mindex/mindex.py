@@ -183,6 +183,35 @@ def _extract_snippets(highlighted: str, limit: int) -> list[FileSearchResult]:
     return results
 
 
+def read_file(index_dir: Path, file_path: Path, start: int = 0, size: int = None) -> str:
+    """Read file content from the index with optional pagination.
+
+    Args:
+        index_dir: Path to the index directory.
+        file_path: Path to the indexed file.
+        start: Starting character offset (default: 0).
+        size: Number of characters to read. None means read entire file.
+
+    Returns:
+        The file content as a string.
+
+    Raises:
+        FileNotFoundError: If the file is not found in the index.
+    """
+    with _db(index_dir) as conn:
+        row = conn.execute(
+            "SELECT content FROM docs WHERE path = ?",
+            (str(file_path.absolute()),),
+        ).fetchone()
+
+        if not row:
+            raise FileNotFoundError(f"File not indexed: {file_path}")
+
+        content = row["content"]
+        end = start + size if size is not None else None
+        return content[start:end]
+
+
 def search_file(
     index_dir: Path, file_path: Path, query: str, limit: int = 10
 ) -> list[FileSearchResult]:
@@ -248,6 +277,12 @@ def main(argv: list[str] | None = None) -> None:
         help="Output format (default: json)",
     )
 
+    # read
+    p_read = sub.add_parser("read", help="Read file content from the index")
+    p_read.add_argument("file", type=Path, help="Path to the indexed file to read")
+    p_read.add_argument("-s", "--start", type=int, default=0, help="Starting character offset (default: 0)")
+    p_read.add_argument("-n", "--size", type=int, default=None, help="Number of characters to read (default: entire file)")
+
     # file
     p_sf = sub.add_parser("file", help="Search within a specific indexed file")
     p_sf.add_argument("file", type=Path, help="Path to the indexed file to search")
@@ -301,6 +336,10 @@ def main(argv: list[str] | None = None) -> None:
         else:
             for r in results:
                 print(r.snippet)
+
+    elif args.command == "read":
+        content = read_file(index_dir, args.file.expanduser(), start=args.start, size=args.size)
+        print(content)
 
 
 if __name__ == "__main__":

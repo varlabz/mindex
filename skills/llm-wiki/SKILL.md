@@ -1,7 +1,7 @@
 ---
-name: llm-wiki
-description: "Search and read wiki files indexed with mindex-cli. Full-text search across indexed markdown content and retrieve file contents."
-argument-hint: "<query>"
+name: llm-wiki-admin
+description: "Manage wiki index: ingest files, remove files."
+argument-hint: "request"
 allowed-tools: shell
 compatibility: Requires uv (uvx).
 metadata:
@@ -9,16 +9,71 @@ metadata:
   index: "SQLite FTS5"
 ---
 
-# LLM Wiki — Search & Read
+# LLM Wiki Admin — Index Management
 
 All commands use `uvx` to run `mindex-cli` on the fly — no permanent installation needed.
 
 **Base command:**
 
 ```bash
-uvx --from git+https://github.com/varlabz/mindex mindex-cli --index <index_dir> <subcommand> [options]
+uvx --from git+https://github.com/varlabz/mindex mindex-cli --index-dir <index_dir> <subcommand> [options]
 ```
 
+<index_dir> is mandatory for all commands and specifies the directory where the wiki index is stored. 
+If not provided, show error and terminate execution.
+
+---
+## Initialization 
+Create a `SCHEMA.md` template file to define the structure and rules for the wiki index in <index_dir> if it does not exist.
+```markdown
+# Wiki directory structure
+summary/    # contains summary files with metadata and references to original files
+raw/        # contains original files with raw content
+index.md    # main index file listing all summaries with links
+log.md      # log of all actions performed on the wiki index
+SCHEMA.md   # defines the structure and rules for the wiki index
+
+# Rules
+- All summary files must be stored in the `summary/` directory.
+  - must contain a title, reference to the original file, and relevant tags
+  - reference to original file in the summary file in markdown format for better discoverability (e.g., `[Original](../raw/sqlite.md)`).
+- The `index.md` file must list all summaries with links to their respective summary files for easy navigation.
+- The `log.md` file must record all actions performed on the wiki for audit purposes.
+  - All actions must be logged in the format: `## [YYYY-MM-DD] <action> | <file_path> or <one_line_short_description>`.
+```
+
+Always ensure `SCHEMA.md` exists in <index_dir> before performing any operations. If it does not exist, create it with the above content.
+Always follow the structure defined in `SCHEMA.md` when adding files to the index.
+---
+
+## Ingest File
+
+To ingest file make steps:
+- Add a file in the searchable index.
+- Create a summary file with title and store in `summary/` directory in <index_dir>.
+- The file name for the summary is the same as the original file but prefixed with `summary/` (e.g., `raw/sqlite.md` → `summary/sqlite.md`).
+- Add tags to summary file for better organization (e.g., `#database #sqlite`).
+- Add reference to summary in `index.md` in <index_dir> with the title of the summary file for better discoverability (e.g., `- [SQLite Notes](summary/sqlite.md)`).
+
+```bash
+mindex-cli --index-dir <index_dir> add <file.md> -t raw
+mindex-cli --index-dir <index_dir> add <summary_file.md> -t summary
+```
+
+### Examples
+
+```bash
+mindex-cli --index-dir <index_dir> add raw/sqlite.md -t raw
+mindex-cli --index-dir <index_dir> add summary/raw-sqlite.md -t summary
+
+# with long path
+mindex-cli --index-dir <index_dir> add raw/notes/sqlite.md -t raw
+mindex-cli --index-dir <index_dir> add summary/raw-notes-sqlite.md -t summary
+
+# with absolute path
+mindex-cli --index-dir <index_dir> add /home/user/wiki/raw/sqlite.md -t raw
+mindex-cli --index-dir <index_dir> add summary/home-user-wiki-summary-sqlite.md -t summary
+```
 ---
 
 ## Search 
@@ -99,25 +154,25 @@ mindex-cli --index <index_dir> read notes/sqlite.md --position 1000 --size 2000
 
 ---
 
-## List Tags
+## Remove File from Index
 
-List all tags across the indexed files.
+Remove a file from the index (does not delete the actual file).
 
 ```bash
-mindex-cli --index <index_dir> tags
+mindex-cli --index-dir <index_dir> rm <file.md>
 ```
 
 **Options:**
 
 | Flag | Short | Default | Description |
 |------|-------|---------|-------------|
-| `--index` | `-i` | current dir | Index directory |
+| `--index-dir` | — | current dir | Index directory |
 
 ### Examples
 
 ```bash
-# List all tags
-mindex-cli --index <index_dir> tags
+# Remove file from index
+mindex-cli --index-dir <index_dir> rm notes/old-notes.md
 ```
 
 ---
@@ -126,6 +181,5 @@ mindex-cli --index <index_dir> tags
 
 | Scenario | Recommendation |
 |----------|---------------|
-| **Large files** | Use `--position` and `--size` with `read` to read in chunks instead of loading the entire file |
-| **FTS5 search syntax** | The search supports FTS5 query syntax — use quotes for exact phrases, e.g., `"exact phrase"` |
-| **File not indexed** | `read` only works on files that have been added to the index first |
+| **Multiple indexes** | Use `--index-dir` to maintain separate wikis (e.g., one per project) |
+| **Tags** | Use consistent tag names for easier filtering and discovery |

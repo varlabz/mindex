@@ -199,6 +199,276 @@ class TestCLISearchPositive:
         for r in results:
             assert r.get("tag") == "python"
 
+    def test_search_no_results(self, index_dir: Path, capfd: pytest.CaptureFixture[str]):
+        """Test that search command prints 'No results.' when nothing matches."""
+        out = _run(["search", "xyznonexistent123"], index_dir, capfd)
+        assert "No results." in out
+
+    def test_search_with_limit(self, index_dir: Path, capfd: pytest.CaptureFixture[str]):
+        """Test that search command respects --limit option."""
+        # Add a file with a unique term to ensure predictable results
+        test_file = index_dir / "limit_test.md"
+        test_file.write_text("unique limit test term here", encoding="utf-8")
+        main(["--index-dir", str(index_dir), "add", str(test_file)])
+
+        out = _run(["search", "limit", "--limit", "1"], index_dir, capfd)
+        results = json.loads(out)
+        assert len(results) <= 1
+
+    def test_search_empty_query(self, index_dir: Path, capfd: pytest.CaptureFixture[str]):
+        """Test that search with empty query raises ValueError."""
+        with pytest.raises(ValueError, match="Query cannot be empty"):
+            _run(["search", ""], index_dir, capfd)
+
+    def test_search_short_query(self, index_dir: Path, capfd: pytest.CaptureFixture[str]):
+        """Test that search with too-short query raises ValueError."""
+        with pytest.raises(ValueError, match="Query too short"):
+            _run(["search", "ab"], index_dir, capfd)
+
+
+class TestCLIFilePositive:
+    """Positive tests for CLI 'file' command."""
+
+    def test_file_search_json_output(
+        self, index_dir: Path, capfd: pytest.CaptureFixture[str]
+    ):
+        """Test that file command outputs valid JSON by default."""
+        test_file = index_dir / "search_target.md"
+        test_file.write_text("apple banana cherry apple date apple", encoding="utf-8")
+        main(["--index-dir", str(index_dir), "add", str(test_file)])
+
+        out = _run(["file", str(test_file), "apple"], index_dir, capfd)
+        results = json.loads(out)
+        assert isinstance(results, list)
+        assert len(results) >= 1
+        for r in results:
+            assert "snippet" in r
+            assert "position" in r
+
+    def test_file_search_text_output(
+        self, index_dir: Path, capfd: pytest.CaptureFixture[str]
+    ):
+        """Test that file command with --format text outputs snippets."""
+        test_file = index_dir / "search_target.md"
+        test_file.write_text("hello world hello", encoding="utf-8")
+        main(["--index-dir", str(index_dir), "add", str(test_file)])
+
+        out = _run(["file", str(test_file), "hello", "--format", "text"], index_dir, capfd)
+        lines = [l for l in out.strip().split("\n") if l]
+        assert len(lines) >= 1
+        assert any("hello" in l for l in lines)
+
+    def test_file_search_with_limit(
+        self, index_dir: Path, capfd: pytest.CaptureFixture[str]
+    ):
+        """Test that file command respects --limit option."""
+        test_file = index_dir / "search_target.md"
+        test_file.write_text("test test test test test", encoding="utf-8")
+        main(["--index-dir", str(index_dir), "add", str(test_file)])
+
+        out = _run(["file", str(test_file), "test", "--limit", "2"], index_dir, capfd)
+        results = json.loads(out)
+        assert len(results) == 2
+
+    def test_file_search_multi_word(
+        self, index_dir: Path, capfd: pytest.CaptureFixture[str]
+    ):
+        """Test file command with multi-word query."""
+        test_file = index_dir / "search_target.md"
+        test_file.write_text("the quick brown fox jumps", encoding="utf-8")
+        main(["--index-dir", str(index_dir), "add", str(test_file)])
+
+        out = _run(["file", str(test_file), "quick brown"], index_dir, capfd)
+        results = json.loads(out)
+        assert len(results) >= 1
+
+
+class TestCLIFileNegative:
+    """Negative tests for CLI 'file' command."""
+
+    def test_file_no_results(
+        self, index_dir: Path, capfd: pytest.CaptureFixture[str]
+    ):
+        """Test that file command prints 'No results.' when nothing matches."""
+        test_file = index_dir / "search_target.md"
+        test_file.write_text("hello world", encoding="utf-8")
+        main(["--index-dir", str(index_dir), "add", str(test_file)])
+
+        out = _run(["file", str(test_file), "nonexistent123"], index_dir, capfd)
+        assert "No results." in out
+
+    def test_file_unindexed_file(
+        self, index_dir: Path, capfd: pytest.CaptureFixture[str]
+    ):
+        """Test that file command returns no results for unindexed file."""
+        test_file = index_dir / "search_target.md"
+        test_file.write_text("hello world", encoding="utf-8")
+        # Do NOT add to index
+
+        out = _run(["file", str(test_file), "hello"], index_dir, capfd)
+        assert "No results." in out
+
+    def test_file_missing_file_argument(
+        self, index_dir: Path, capfd: pytest.CaptureFixture[str]
+    ):
+        """Test that file command requires a file argument."""
+        with pytest.raises(SystemExit):
+            _run(["file"], index_dir, capfd)
+
+    def test_file_missing_query_argument(
+        self, index_dir: Path, capfd: pytest.CaptureFixture[str]
+    ):
+        """Test that file command requires a query argument."""
+        with pytest.raises(SystemExit):
+            _run(["file", "somefile.md"], index_dir, capfd)
+
+
+class TestCLIReadPositive:
+    """Positive tests for CLI 'read' command."""
+
+    def test_read_full_file(
+        self, index_dir: Path, capfd: pytest.CaptureFixture[str]
+    ):
+        """Test that read command outputs full file content."""
+        test_file = index_dir / "read_target.md"
+        expected = "# Title\n\nHello world content."
+        test_file.write_text(expected, encoding="utf-8")
+        main(["--index-dir", str(index_dir), "add", str(test_file)])
+
+        out = _run(["read", str(test_file)], index_dir, capfd)
+        assert expected in out
+
+    def test_read_with_start_offset(
+        self, index_dir: Path, capfd: pytest.CaptureFixture[str]
+    ):
+        """Test that read command respects --start option."""
+        test_file = index_dir / "read_target.md"
+        test_file.write_text("0123456789", encoding="utf-8")
+        main(["--index-dir", str(index_dir), "add", str(test_file)])
+
+        out = _run(["read", str(test_file), "--start", "5"], index_dir, capfd)
+        assert "56789" in out
+
+    def test_read_with_size(
+        self, index_dir: Path, capfd: pytest.CaptureFixture[str]
+    ):
+        """Test that read command respects --size option."""
+        test_file = index_dir / "read_target.md"
+        test_file.write_text("0123456789", encoding="utf-8")
+        main(["--index-dir", str(index_dir), "add", str(test_file)])
+
+        out = _run(["read", str(test_file), "--start", "2", "--size", "3"], index_dir, capfd)
+        assert "234" in out
+
+    def test_read_empty_file(
+        self, index_dir: Path, capfd: pytest.CaptureFixture[str]
+    ):
+        """Test reading an empty file."""
+        test_file = index_dir / "empty.md"
+        test_file.write_text("", encoding="utf-8")
+        main(["--index-dir", str(index_dir), "add", str(test_file)])
+
+        out = _run(["read", str(test_file)], index_dir, capfd)
+        # print() adds a trailing newline even for empty string
+        assert out.strip() == ""
+
+
+class TestCLIReadNegative:
+    """Negative tests for CLI 'read' command."""
+
+    def test_read_unindexed_file(
+        self, index_dir: Path, capfd: pytest.CaptureFixture[str]
+    ):
+        """Test that read command raises error for unindexed file."""
+        test_file = index_dir / "not_indexed.md"
+        test_file.write_text("content", encoding="utf-8")
+
+        with pytest.raises(FileNotFoundError):
+            _run(["read", str(test_file)], index_dir, capfd)
+
+    def test_read_missing_file_argument(
+        self, index_dir: Path, capfd: pytest.CaptureFixture[str]
+    ):
+        """Test that read command requires a file argument."""
+        with pytest.raises(SystemExit):
+            _run(["read"], index_dir, capfd)
+
+
+class TestCLIEdgeCases:
+    """Edge case tests for CLI commands."""
+
+    def test_no_command_prints_help(
+        self, index_dir: Path, capfd: pytest.CaptureFixture[str]
+    ):
+        """Test that running main with no command prints help."""
+        main(["--index-dir", str(index_dir)])
+        out, err = capfd.readouterr()
+        assert "usage" in out.lower() or "help" in out.lower()
+
+    def test_index_dir_does_not_exist(self):
+        """Test that CLI raises error for non-existent index directory."""
+        with pytest.raises(ValueError, match="does not exist"):
+            main(["--index-dir", "/nonexistent/path/xyz", "search", "test"])
+
+    def test_add_file_with_tilde_path(self, index_dir: Path, capfd: pytest.CaptureFixture[str]):
+        """Test that add command handles paths with tilde."""
+        # Create a subdirectory with tilde-like name
+        subdir = index_dir / "tilde_test"
+        subdir.mkdir()
+        test_file = subdir / "file.md"
+        test_file.write_text("content", encoding="utf-8")
+
+        out = _run(["add", str(test_file)], index_dir, capfd)
+        assert "Indexed:" in out
+
+    def test_search_unicode_content(
+        self, index_dir: Path, capfd: pytest.CaptureFixture[str]
+    ):
+        """Test search with unicode file content."""
+        test_file = index_dir / "unicode.md"
+        test_file.write_text("こんにちは世界", encoding="utf-8")
+        main(["--index-dir", str(index_dir), "add", str(test_file)])
+
+        # Search for ASCII term that won't match CJK
+        out = _run(["search", "hello"], index_dir, capfd)
+        assert "No results." in out
+
+    def test_multiple_add_same_file(
+        self, index_dir: Path, capfd: pytest.CaptureFixture[str]
+    ):
+        """Test adding the same file multiple times."""
+        test_file = index_dir / "test.md"
+        test_file.write_text("v1", encoding="utf-8")
+        main(["--index-dir", str(index_dir), "add", str(test_file)])
+
+        test_file.write_text("v2", encoding="utf-8")
+        out = _run(["add", str(test_file)], index_dir, capfd)
+        assert "Indexed:" in out
+
+        # Verify content was updated
+        out = _run(["read", str(test_file)], index_dir, capfd)
+        assert "v2" in out
+
+    def test_rm_nonexistent_file_no_crash(
+        self, index_dir: Path, capfd: pytest.CaptureFixture[str]
+    ):
+        """Test that rm of a never-added file doesn't crash."""
+        out = _run(["rm", "never_added_file.md"], index_dir, capfd)
+        assert "never_added_file.md" in out
+
+    def test_search_tag_with_special_chars(
+        self, index_dir: Path, capfd: pytest.CaptureFixture[str]
+    ):
+        """Test search with tag containing special characters."""
+        test_file = index_dir / "special_tag.md"
+        test_file.write_text("tagged content", encoding="utf-8")
+        main(["--index-dir", str(index_dir), "add", str(test_file), "--tag", "my-tag_v2"])
+
+        out = _run(["search", "tagged", "--tag", "my-tag_v2"], index_dir, capfd)
+        results = json.loads(out)
+        assert len(results) >= 1
+        assert results[0].get("tag") == "my-tag_v2"
+
     def test_search_with_limit(
         self, indexed_files: dict[str, Path], index_dir: Path, capfd: pytest.CaptureFixture[str]
     ):

@@ -1,7 +1,7 @@
 # Agent Configuration
 
 ## Project Overview
-A Python package (`mindex`) providing SQLite FTS5-based search functionality with a wiki-style knowledge base. Uses `llm-wiki` MCP server for agent interactions.
+A Python package (`mindex`) providing SQLite FTS5-based search functionality in files with filtering by tag.
 
 ## Defaults
 

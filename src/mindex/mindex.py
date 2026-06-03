@@ -267,22 +267,19 @@ def main(argv: list[str] | None = None) -> None:
         parser.print_help()
         return
 
-    index_dir = Path.expanduser(args.index_dir)
-    if not index_dir.exists():
-        raise ValueError(f"Index directory does not exist: {index_dir}")
+    if not args.index_dir.exists():
+        raise ValueError(f"Index directory does not exist: {args.index_dir}")
 
     if args.command == "add":
-        file = Path.expanduser(args.file)
-        add_file(index_dir, file, tag=args.tag)
-        print(f"Indexed: {file}")
+        add_file(args.index_dir, args.file, tag=args.tag)
+        print(f"Indexed: {args.file}")
 
     elif args.command == "rm":
-        file = Path.expanduser(args.file)
-        del_file(index_dir, file)
-        print(f"Removed: {file}")
+        del_file(args.index_dir, args.file)
+        print(f"Removed: {args.file}")
 
     elif args.command == "search":
-        results = search(index_dir, args.query, tag=args.tag, limit=args.limit)
+        results = search(args.index_dir, args.query, tag=args.tag, limit=args.limit)
         if not results:
             print("No results.")
             return
@@ -293,8 +290,7 @@ def main(argv: list[str] | None = None) -> None:
                 print(f"{r.path}\t{r.tag or ''}\t{r.snippet}")
 
     elif args.command == "file":
-        file = Path.expanduser(args.file)
-        results = search_file(index_dir, file, args.query, limit=args.limit)
+        results = search_file(args.index_dir, args.file, args.query, limit=args.limit)
         if not results:
             print("No results.")
             return

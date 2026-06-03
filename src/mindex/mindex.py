@@ -280,8 +280,8 @@ def main(argv: list[str] | None = None) -> None:
     # read
     p_read = sub.add_parser("read", help="Read file content from the index")
     p_read.add_argument("file", type=Path, help="Path to the indexed file to read")
-    p_read.add_argument("-s", "--start", type=int, default=0, help="Starting character offset (default: 0)")
-    p_read.add_argument("-n", "--size", type=int, default=None, help="Number of characters to read (default: entire file)")
+    p_read.add_argument("-p", "--position", type=int, default=0, help="Starting character offset (default: 0)")
+    p_read.add_argument("-s", "--size", type=int, default=4000, help="Number of characters to read (default: 4000 chars)")
 
     # file
     p_sf = sub.add_parser("file", help="Search within a specific indexed file")
@@ -338,7 +338,7 @@ def main(argv: list[str] | None = None) -> None:
                 print(r.snippet)
 
     elif args.command == "read":
-        content = read_file(index_dir, args.file.expanduser(), start=args.start, size=args.size)
+        content = read_file(index_dir, args.file.expanduser(), start=args.position, size=args.size)
         print(content)
 
 

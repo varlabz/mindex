@@ -341,12 +341,12 @@ class TestCLIReadPositive:
     def test_read_with_start_offset(
         self, index_dir: Path, capfd: pytest.CaptureFixture[str]
     ):
-        """Test that read command respects --start option."""
+        """Test that read command respects --position option."""
         test_file = index_dir / "read_target.md"
         test_file.write_text("0123456789", encoding="utf-8")
         main(["--index-dir", str(index_dir), "add", str(test_file)])
 
-        out = _run(["read", str(test_file), "--start", "5"], index_dir, capfd)
+        out = _run(["read", str(test_file), "--position", "5"], index_dir, capfd)
         assert "56789" in out
 
     def test_read_with_size(
@@ -357,7 +357,7 @@ class TestCLIReadPositive:
         test_file.write_text("0123456789", encoding="utf-8")
         main(["--index-dir", str(index_dir), "add", str(test_file)])
 
-        out = _run(["read", str(test_file), "--start", "2", "--size", "3"], index_dir, capfd)
+        out = _run(["read", str(test_file), "--position", "2", "--size", "3"], index_dir, capfd)
         assert "234" in out
 
     def test_read_empty_file(

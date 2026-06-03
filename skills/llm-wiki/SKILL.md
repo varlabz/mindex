@@ -11,6 +11,15 @@ metadata:
 
 # LLM Wiki 
 
+<index_dir> is mandatory for all commands and specifies the directory where the wiki index is stored. 
+If not provided, show error and terminate execution.
+
+`SCHEMA.md` is required in <index_dir> before performing any operations. 
+If it does not exist, show error and terminate execution.
+
+Read the `SCHEMA.md` template file to understand the structure and rules for the wiki index in <index_dir> before using any commands.
+Must follow precisely the instructions defined in `SCHEMA.md` in <index_dir>.
+
 All commands use `uvx` to run `mindex-cli` on the fly — no permanent installation needed.
 
 **Base command:**
@@ -19,20 +28,19 @@ All commands use `uvx` to run `mindex-cli` on the fly — no permanent installat
 uvx --from git+https://github.com/varlabz/mindex mindex-cli --index-dir <index_dir> <subcommand> [options]
 ```
 
-<index_dir> is mandatory for all commands and specifies the directory where the wiki index is stored. 
-If not provided, show error and terminate execution.
-
-`SCHEMA.md` is required in <index_dir> before performing any operations. 
-If it does not exist, show error and terminate execution.
-
-Always follow the instructions defined in `SCHEMA.md` in <index_dir>.
-
 ---
 
 ## Ingest File
 
 - Add a file in the searchable index.
 - The file name for the summary is the same as the original file with replaced directory dividers on '-' (e.g., `raw/sqlite.md` → `summary/raw-sqlite.md`).
+- A Summary file must be stored in the `summary/` in <index_dir> directory.
+  - must contain a title, summary, reference to the original file, and relevant tags.
+  - summary should be concise and informative, highlighting key points from the original file.
+  - reference to the original file (e.g., `[Original](../raw/sqlite.md)`).
+  - tags to summary file (e.g., `#database #sqlite`).
+- Update `index.md`.
+- Update `log.md`.
 
 ```bash
 mindex-cli --index-dir <index_dir> add <file.md> -t raw
@@ -42,6 +50,7 @@ mindex-cli --index-dir <index_dir> add <summary_file.md> -t summary
 ### Examples
 
 ```bash
+# simple case
 mindex-cli --index-dir <index_dir> add raw/sqlite.md -t raw
 mindex-cli --index-dir <index_dir> add summary/raw-sqlite.md -t summary
 

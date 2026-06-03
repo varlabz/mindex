@@ -183,6 +183,39 @@ def _extract_snippets(highlighted: str, limit: int) -> list[FileSearchResult]:
     return results
 
 
+@dataclass
+class FileInfo:
+    path: str
+    size: int
+    updated_at: str
+    tag: str
+
+
+def info(index_dir: Path, file_path: Path) -> FileInfo:
+    """Return basic info about an indexed file record.
+
+    Args:
+        index_dir: Path to the index directory.
+        file_path: Path to the indexed file.
+
+    Returns:
+        FileInfo with path, size, updated_at, and tag.
+
+    Raises:
+        FileNotFoundError: If the file is not found in the index.
+    """
+    with _db(index_dir) as conn:
+        row = conn.execute(
+            "SELECT path, size, updated_at, tag FROM docs WHERE path = ?",
+            (str(file_path.absolute()),),
+        ).fetchone()
+
+        if not row:
+            raise FileNotFoundError(f"File not indexed: {file_path}")
+
+        return FileInfo(**row)
+
+
 def read_file(index_dir: Path, file_path: Path, start: int = 0, size: int = None) -> str:
     """Read file content from the index with optional pagination.
 
@@ -277,6 +310,17 @@ def main(argv: list[str] | None = None) -> None:
         help="Output format (default: json)",
     )
 
+    # info
+    p_info = sub.add_parser("info", help="Show info about an indexed file")
+    p_info.add_argument("file", type=Path, help="Path to the indexed file")
+    p_info.add_argument(
+        "-f",
+        "--format",
+        choices=["json", "text"],
+        default="json",
+        help="Output format (default: json)",
+    )
+
     # read
     p_read = sub.add_parser("read", help="Read file content from the index")
     p_read.add_argument("file", type=Path, help="Path to the indexed file to read")
@@ -314,6 +358,16 @@ def main(argv: list[str] | None = None) -> None:
     elif args.command == "rm":
         del_file(index_dir, args.file.expanduser())
         print(f"Removed: {args.file}")
+
+    elif args.command == "info":
+        fi = info(index_dir, args.file.expanduser())
+        if args.format == "json":
+            print(json.dumps(asdict(fi), indent=2))
+        else:
+            print(f"Path:        {fi.path}")
+            print(f"Size:        {fi.size}")
+            print(f"Updated at:  {fi.updated_at}")
+            print(f"Tag:         {fi.tag or '-'}")
 
     elif args.command == "search":
         results = search(index_dir, args.query, tag=args.tag, limit=args.limit)

@@ -215,6 +215,16 @@ class TestCLISearchPositive:
         results = json.loads(out)
         assert len(results) <= 1
 
+    def test_search_with_short_limit_option(self, index_dir: Path, capfd: pytest.CaptureFixture[str]):
+        """Test that search command respects -n short option for limit."""
+        test_file = index_dir / "limit_test2.md"
+        test_file.write_text("unique limit test term here", encoding="utf-8")
+        main(["--index-dir", str(index_dir), "add", str(test_file)])
+
+        out = _run(["search", "limit", "-n", "1"], index_dir, capfd)
+        results = json.loads(out)
+        assert len(results) <= 1
+
     def test_search_empty_query(self, index_dir: Path, capfd: pytest.CaptureFixture[str]):
         """Test that search with empty query raises ValueError."""
         with pytest.raises(ValueError, match="Query cannot be empty"):
@@ -349,6 +359,17 @@ class TestCLIReadPositive:
         out = _run(["read", str(test_file), "--position", "5"], index_dir, capfd)
         assert "56789" in out
 
+    def test_read_with_short_position_option(
+        self, index_dir: Path, capfd: pytest.CaptureFixture[str]
+    ):
+        """Test that read command respects -p short option for position."""
+        test_file = index_dir / "read_target.md"
+        test_file.write_text("0123456789", encoding="utf-8")
+        main(["--index-dir", str(index_dir), "add", str(test_file)])
+
+        out = _run(["read", str(test_file), "-p", "7"], index_dir, capfd)
+        assert "789" in out
+
     def test_read_with_size(
         self, index_dir: Path, capfd: pytest.CaptureFixture[str]
     ):
@@ -359,6 +380,17 @@ class TestCLIReadPositive:
 
         out = _run(["read", str(test_file), "--position", "2", "--size", "3"], index_dir, capfd)
         assert "234" in out
+
+    def test_read_with_short_size_option(
+        self, index_dir: Path, capfd: pytest.CaptureFixture[str]
+    ):
+        """Test that read command respects -s short option for size."""
+        test_file = index_dir / "read_target.md"
+        test_file.write_text("0123456789", encoding="utf-8")
+        main(["--index-dir", str(index_dir), "add", str(test_file)])
+
+        out = _run(["read", str(test_file), "-p", "0", "-s", "4"], index_dir, capfd)
+        assert "0123" in out
 
     def test_read_empty_file(
         self, index_dir: Path, capfd: pytest.CaptureFixture[str]
@@ -392,6 +424,85 @@ class TestCLIReadNegative:
         """Test that read command requires a file argument."""
         with pytest.raises(SystemExit):
             _run(["read"], index_dir, capfd)
+
+
+class TestCLIInfoPositive:
+    """Positive tests for CLI 'info' command."""
+
+    def test_info_json_output(
+        self, index_dir: Path, capfd: pytest.CaptureFixture[str]
+    ):
+        """Test that info command outputs valid JSON by default."""
+        test_file = index_dir / "info_target.md"
+        test_file.write_text("some content here", encoding="utf-8")
+        main(["--index-dir", str(index_dir), "add", str(test_file)])
+
+        out = _run(["info", str(test_file)], index_dir, capfd)
+        result = json.loads(out)
+        assert "path" in result
+        assert "size" in result
+        assert "updated_at" in result
+        assert "tag" in result
+        assert result["size"] == len("some content here")
+        assert result["tag"] is None
+
+    def test_info_text_output(
+        self, index_dir: Path, capfd: pytest.CaptureFixture[str]
+    ):
+        """Test that info command with --format text outputs labeled fields."""
+        test_file = index_dir / "info_target.md"
+        test_file.write_text("some content here", encoding="utf-8")
+        main(["--index-dir", str(index_dir), "add", str(test_file)])
+
+        out = _run(["info", str(test_file), "--format", "text"], index_dir, capfd)
+        assert "Path:" in out
+        assert "Size:" in out
+        assert "Updated at:" in out
+        assert "Tag:" in out
+
+    def test_info_with_tag(
+        self, index_dir: Path, capfd: pytest.CaptureFixture[str]
+    ):
+        """Test that info command includes the tag when one is set."""
+        test_file = index_dir / "info_target.md"
+        test_file.write_text("content", encoding="utf-8")
+        main(["--index-dir", str(index_dir), "add", str(test_file), "--tag", "wiki"])
+
+        out = _run(["info", str(test_file)], index_dir, capfd)
+        result = json.loads(out)
+        assert result["tag"] == "wiki"
+
+    def test_info_text_shows_dash_for_missing_tag(
+        self, index_dir: Path, capfd: pytest.CaptureFixture[str]
+    ):
+        """Test that info text format shows '-' for missing tag."""
+        test_file = index_dir / "info_target.md"
+        test_file.write_text("content", encoding="utf-8")
+        main(["--index-dir", str(index_dir), "add", str(test_file)])
+
+        out = _run(["info", str(test_file), "--format", "text"], index_dir, capfd)
+        assert "Tag:         -" in out
+
+
+class TestCLIInfoNegative:
+    """Negative tests for CLI 'info' command."""
+
+    def test_info_unindexed_file(
+        self, index_dir: Path, capfd: pytest.CaptureFixture[str]
+    ):
+        """Test that info command raises error for unindexed file."""
+        test_file = index_dir / "not_indexed.md"
+        test_file.write_text("content", encoding="utf-8")
+
+        with pytest.raises(FileNotFoundError):
+            _run(["info", str(test_file)], index_dir, capfd)
+
+    def test_info_missing_file_argument(
+        self, index_dir: Path, capfd: pytest.CaptureFixture[str]
+    ):
+        """Test that info command requires a file argument."""
+        with pytest.raises(SystemExit):
+            _run(["info"], index_dir, capfd)
 
 
 class TestCLIEdgeCases:

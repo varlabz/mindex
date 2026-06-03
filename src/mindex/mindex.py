@@ -1,11 +1,13 @@
-from dataclasses import dataclass
+import argparse
 import hashlib
+import json
 import os
 import sqlite3
+from dataclasses import asdict, dataclass
 from pathlib import Path
 
+DB_FILE = "mindex.sqlite"  # index file stored in vault directory
 
-DB_FILE = "mindex2.sqlite"  # index file stored in vault directory
 
 class _db:
     """Context-manager wrapper for sqlite3.Connection with auto-close."""
@@ -27,6 +29,7 @@ class _db:
         conn.execute("PRAGMA foreign_keys=ON")
         conn.executescript(SCHEMA)
         return conn
+
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS docs (
@@ -59,13 +62,15 @@ CREATE TRIGGER IF NOT EXISTS docs_au AFTER UPDATE ON docs BEGIN
 END;
 """
 
+
 def add_file(index_dir: Path, file_path: Path, tag: str = None) -> None:
     """Add or update a file in the index."""
     content = file_path.read_text(encoding="utf-8")
     hash = hashlib.sha256(content.encode()).hexdigest()
 
     with _db(index_dir) as conn:
-        conn.execute("""
+        conn.execute(
+            """
             INSERT INTO docs (path, content, size, hash, tag)
             VALUES (?, ?, ?, ?, ?)
             ON CONFLICT(path) DO UPDATE SET
@@ -74,7 +79,9 @@ def add_file(index_dir: Path, file_path: Path, tag: str = None) -> None:
                 hash = excluded.hash,
                 tag = excluded.tag,
                 updated_at = datetime('now')
-        """, (str(file_path.absolute()), content, len(content), hash, tag))
+        """,
+            (str(file_path.absolute()), content, len(content), hash, tag),
+        )
         conn.commit()
 
 
@@ -84,12 +91,14 @@ def del_file(index_dir: Path, file_path: Path) -> None:
         conn.execute("DELETE FROM docs WHERE path = ?", (str(file_path.absolute()),))
         conn.commit()
 
+
 @dataclass
 class SearchResult:
     path: str
     snippet: str
     tag: str
     updated_at: str
+
 
 def _escape_fts5(query: str) -> str:
     """Escape a user query for safe use as a literal FTS5 phrase match.
@@ -119,7 +128,7 @@ def search(index_dir: Path, query: str, tag: str = None, limit: int = 10) -> lis
                    d.tag, d.updated_at
             FROM docs_fts
             JOIN docs d ON docs_fts.rowid = d.id
-            WHERE docs_fts MATCH ? {' AND d.tag = ?' if tag else ''}
+            WHERE docs_fts MATCH ? {" AND d.tag = ?" if tag else ""}
             ORDER BY bm25(docs_fts)
             LIMIT ?
         """
@@ -137,9 +146,11 @@ class FileSearchResult:
     snippet: str
     position: int
 
+
 MARK_START = "|$d%T&#-s|"
 MARK_END = "|$d%T&#-e|"
 PAD = 40
+
 
 def _extract_snippets(highlighted: str, limit: int) -> list[FileSearchResult]:
     """Extract matching snippets from highlighted text by scanning for MARK_START/MARK_END pairs."""
@@ -162,6 +173,9 @@ def _extract_snippets(highlighted: str, limit: int) -> list[FileSearchResult]:
         ctx_start = max(0, pos - PAD)
         ctx_end = min(len(highlighted), term_end + PAD)
         snippet = highlighted[ctx_start:ctx_end]
+
+        # Strip FTS5 highlight markers from the snippet
+        snippet = snippet.replace(MARK_START, "").replace(MARK_END, "")
 
         results.append(FileSearchResult(snippet=snippet, position=real_pos))
         search_start = term_end
@@ -193,3 +207,103 @@ def search_file(
 
         return _extract_snippets(row["h"], limit)
 
+
+# ── CLI ────────────────────────────────────────────────────────────────
+
+
+def main(argv: list[str] | None = None) -> None:
+    """Command-line interface for mindex operations."""
+    parser = argparse.ArgumentParser(
+        prog="mindex",
+        description="SQLite FTS5-based wiki search index",
+    )
+    parser.add_argument(
+        "--index-dir",
+        type=Path,
+        default=Path("."),
+        help="Index directory containing mindex.sqlite (default: current directory)",
+    )
+
+    sub = parser.add_subparsers(dest="command", help="Available commands")
+
+    # add
+    p_add = sub.add_parser("add", help="Add or update a file in the index")
+    p_add.add_argument("file", type=Path, help="Path to the file to index")
+    p_add.add_argument("-t", "--tag", default=None, help="Optional tag for the file")
+
+    # rm
+    p_del = sub.add_parser("rm", help="Remove a file from the index")
+    p_del.add_argument("file", type=Path, help="Path to the file to remove")
+
+    # search
+    p_search = sub.add_parser("search", help="Search indexed files via FTS5")
+    p_search.add_argument("query", help="Search query (min 3 chars)")
+    p_search.add_argument("-t", "--tag", default=None, help="Filter by tag")
+    p_search.add_argument("-n", "--limit", type=int, default=10, help="Max results")
+    p_search.add_argument(
+        "-f",
+        "--format",
+        choices=["json", "text"],
+        default="json",
+        help="Output format (default: json)",
+    )
+
+    # file
+    p_sf = sub.add_parser("file", help="Search within a specific indexed file")
+    p_sf.add_argument("file", type=Path, help="Path to the indexed file to search")
+    p_sf.add_argument("query", help="Search query")
+    p_sf.add_argument("-n", "--limit", type=int, default=10, help="Max results")
+    p_sf.add_argument(
+        "-f",
+        "--format",
+        choices=["json", "text"],
+        default="json",
+        help="Output format (default: json)",
+    )
+
+    args = parser.parse_args(argv)
+
+    if args.command is None:
+        parser.print_help()
+        return
+
+    index_dir = Path.expanduser(args.index_dir)
+    if not index_dir.exists():
+        raise ValueError(f"Index directory does not exist: {index_dir}")
+
+    if args.command == "add":
+        file = Path.expanduser(args.file)
+        add_file(index_dir, file, tag=args.tag)
+        print(f"Indexed: {file}")
+
+    elif args.command == "rm":
+        file = Path.expanduser(args.file)
+        del_file(index_dir, file)
+        print(f"Removed: {file}")
+
+    elif args.command == "search":
+        results = search(index_dir, args.query, tag=args.tag, limit=args.limit)
+        if not results:
+            print("No results.")
+            return
+        if args.format == "json":
+            print(json.dumps([asdict(r) for r in results], indent=2))
+        else:
+            for r in results:
+                print(f"{r.path}\t{r.tag or ''}\t{r.snippet}")
+
+    elif args.command == "file":
+        file = Path.expanduser(args.file)
+        results = search_file(index_dir, file, args.query, limit=args.limit)
+        if not results:
+            print("No results.")
+            return
+        if args.format == "json":
+            print(json.dumps([asdict(r) for r in results], indent=2))
+        else:
+            for r in results:
+                print(r.snippet)
+
+
+if __name__ == "__main__":
+    main()

@@ -2,25 +2,17 @@
 
 from .mindex import (
     add_file,
+    del_file,
     search,
-    list_tags,
-    info,
-    read_file,
-    delete_file,
-    _normalize_tags,
-    _parse_tags,
+    search_file,
     _db,
 )
 
 __version__ = "0.1.0"
 __all__ = [
     "add_file",
+    "del_file",
     "search",
-    "list_tags",
-    "info",
-    "read_file",
-    "delete_file",
-    "_normalize_tags",
-    "_parse_tags",
+    "search_file",
     "_db",
 ]

@@ -94,7 +94,7 @@ exclude = [
 [tool.pytest.ini_options]
 testpaths = ["src/tests"]
 python_files = ["test_*.py", "*_test.py"]
-addopts = "-v --tb=short"
+addopts = "-qq --tb=no --no-header"
 
 [tool.mypy]
 python_version = "3.10"

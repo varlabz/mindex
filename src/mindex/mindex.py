@@ -5,7 +5,7 @@ from pathlib import Path
 
 from mindex.cmd_add_file import add_file
 from mindex.cmd_del_file import del_file
-from mindex.cmd_info_file import info_by_file, info_by_tag, print_info
+from mindex.cmd_info_file import info_by_file, print_info
 from mindex.cmd_lint import lint, lint_fix, lint_output
 from mindex.cmd_read_file import read_file
 from mindex.cmd_search import search

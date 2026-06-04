@@ -1,6 +1,5 @@
 """Del file command: remove a file from the index."""
 
-import glob
 from pathlib import Path
 
 from mindex.db import _db

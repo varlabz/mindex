@@ -42,7 +42,7 @@ def add_file(index_dir: Path, file_path: str) -> int:
                     hash = excluded.hash,
                     updated_at = datetime('now')
             """,
-                (str(fp.absolute()), content, len(content), file_hash, ),
+                (str(fp.absolute()), content, len(content), file_hash, None),
             )
             count += 1
         conn.commit()

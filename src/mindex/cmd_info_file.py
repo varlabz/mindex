@@ -32,8 +32,8 @@ def info_by_file(index_dir: Path, file_path: str) -> list[FileInfo]:
     """
     with _db(index_dir) as conn:
         rows = conn.execute(
-            "SELECT path, size, updated_at, FROM docs WHERE path GLOB ?",
-            (file_path, )
+            "SELECT path, size, updated_at FROM docs WHERE path GLOB ?",
+            (file_path,)
         ).fetchall()
         result = [FileInfo(**row) for row in rows]
         return result

@@ -6,7 +6,7 @@ A Python package (`mindex`) providing SQLite FTS5-based search functionality in 
 ## Defaults
 
 ### Wiki
-- Use `llm-wiki` with index directory set to the project root.
+- Use `llm-wiki` skills with index directory set the project root + `tmp/wiki`.
 
 ### Tooling
 - Use `jq` for JSON parsing.

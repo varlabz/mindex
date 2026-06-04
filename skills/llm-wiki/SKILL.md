@@ -37,14 +37,13 @@ uvx --from git+https://github.com/varlabz/mindex mindex-cli --index-dir <index_d
 - A Summary file must be stored in the `summary/` in <index_dir> directory.
   - must contain a title, summary, reference to the original file, and relevant tags.
   - summary should be concise and informative, highlighting key points from the original file.
-  - reference to the original file (e.g., `[Original](../raw/sqlite.md)`).
-  - tags to summary file (e.g., `#database #sqlite`).
+  - reference to the original file (e.g., `[Original](raw/sqlite.md)`).
+  - tags in summary file (e.g., `#database #sqlite`).
 - Update index file.
-- Update log file after execution.
 
 ```bash
-mindex-cli --index-dir <index_dir> add <file.md> -t raw
-mindex-cli --index-dir <index_dir> add <summary_file.md> -t summary
+mindex-cli --index-dir <index_dir> add <file.md>
+mindex-cli --index-dir <index_dir> add <summary_file.md>
 ```
 
 ### Examples
@@ -73,7 +72,6 @@ Use FTS5 query syntax for advanced search capabilities (e.g., exact phrases with
 - Search in file with `mindex-cli file` command for more focused search within a specific file.
 - Read specific files with `mindex-cli read` command to get full content when you find relevant summaries or search results.
 - Change search request if don't get relevant results — try different keywords, use quotes for exact phrases.
-- Update log file after execution.
 
 ```bash
 mindex-cli --index-dir <index_dir> search "<query>" [options]
@@ -113,7 +111,6 @@ mindex-cli --index-dir <index_dir> search "transformer architecture" --format te
 
 Search within a specific indexed file using FTS5.
 Useful for focused searches when you know which file contains the information you need.
-Update log file after execution.
 
 ```bash
 mindex-cli --index-dir <index_dir> file <file.md> "<query>" [options]
@@ -125,7 +122,6 @@ mindex-cli --index-dir <index_dir> file <file.md> "<query>" [options]
 |------|-------|---------|-------------|
 | `--limit` | `-n` | 10 | Maximum number of results |
 | `--format` | `-f` | `json` | Output format: `json` or `text` |
-| `--index-dir` | `-i` | current dir | Index directory |
 
 ### Examples
 
@@ -146,7 +142,6 @@ mindex-cli --index-dir <index_dir> file notes/sqlite.md "fts5" --format text
 
 Read the content of an indexed file, optionally from a specific position.
 Can be used to read large files in chunks by specifying `--position` and `--size` to avoid loading the entire file into memory at once.
-Update log file after execution.
 
 ```bash
 mindex-cli --index-dir <index_dir> read <file.md> [options]
@@ -158,7 +153,6 @@ mindex-cli --index-dir <index_dir> read <file.md> [options]
 |------|-------|---------|-------------|
 | `--position` | `-p` | `0` | Start position (character offset) |
 | `--size` | `-s` | `4000` | Number of characters to show |
-| `--index-dir` | `-i` | current dir | Index directory |
 
 ### Examples
 
@@ -177,20 +171,19 @@ mindex-cli --index-dir <index_dir> read notes/sqlite.md --position 1000 --size 2
 
 ## Info
 
-Show metadata about an indexed file — path, size, last updated timestamp, and tag.
-Useful for checking whether a file is indexed and reviewing its properties without reading the full content.
-Update log file after execution.
+Show metadata about indexed files — path, size, last updated timestamp, and tag.
+Useful for checking whether a file is indexed, listing files by tag, or reviewing file properties without reading the full content.
 
 ```bash
-mindex-cli --index-dir <index_dir> info <file.md> [options]
+mindex-cli --index-dir <index_dir> info [file.md] [options]
 ```
 
 **Options:**
 
 | Flag | Short | Default | Description |
 |------|-------|---------|-------------|
+| `--tag` | `-t` | — | Show all records with this tag (file argument not required) |
 | `--format` | `-f` | `json` | Output format: `json` or `text` |
-| `--index-dir` | — | current dir | Index directory |
 
 ### Examples
 
@@ -200,23 +193,39 @@ mindex-cli --index-dir <index_dir> info raw/sqlite.md
 
 # Show file info (text output)
 mindex-cli --index-dir <index_dir> info raw/sqlite.md --format text
+
+# List all files with a specific tag
+mindex-cli --index-dir <index_dir> info --tag raw
+
+# List all files with a specific tag (text output)
+mindex-cli --index-dir <index_dir> info --tag summary --format text
+
+# List all indexed files (no file argument)
+mindex-cli --index-dir <index_dir> info
 ```
 
 ---
 
 ## Lint Index Directory
 
-- Check the integrity of the wiki index directory, ensuring all required files are present and correctly formatted according to `SCHEMA.md`.
-- Iterate through all directories defined in `SCHEMA.md` and call `./scripts/lint.sh` for each directory to validate the files within or fix.
-- Do not fix automatically, only if requested via `fix` command.
-- Update log file after execution.
+- Check the integrity of the wiki index, ensuring all indexed files exist on disk and belong to the correct directory as defined in `SCHEMA.md`.
+- Don't use `--fix` to delete records. Need to confirm deletion before records are deleted.
 
 ```bash
-# lint the directory structure/index
-./scripts/lint.sh <index_dir> <directory> check
+# lint all indexed files
+mindex-cli --index-dir <index_dir> lint
 
-# fix the the directory structure/index
-./scripts/lint.sh <index_dir> <directory> fix
+# lint files in a specific directory
+mindex-cli --index-dir <index_dir> lint <directory>
+
+# plain text output
+mindex-cli --index-dir <index_dir> lint --format text
+
+# fix: delete records for files that no longer exist
+mindex-cli --index-dir <index_dir> lint --fix
+
+# fix: delete records for missing files in a specific directory
+mindex-cli --index-dir <index_dir> lint <directory> --fix
 ```
 
 ---
@@ -224,7 +233,6 @@ mindex-cli --index-dir <index_dir> info raw/sqlite.md --format text
 ## Remove File from Index (dangerous)
 
 Remove a file from the index (does not delete the actual file).
-Update log file after execution.
 
 ```bash
 mindex-cli --index-dir <index_dir> rm <file.md>

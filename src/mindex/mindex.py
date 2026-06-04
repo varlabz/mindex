@@ -5,7 +5,7 @@ from pathlib import Path
 
 from mindex.cmd_add_file import add_file
 from mindex.cmd_del_file import del_file
-from mindex.cmd_info import info_by_file, info_by_tag
+from mindex.cmd_info import info_by_file, info_by_tag, print_info
 from mindex.cmd_lint import lint, lint_fix, lint_output
 from mindex.cmd_read_file import read_file
 from mindex.cmd_search import search
@@ -55,10 +55,10 @@ def main(argv: list[str] | None = None) -> None:
     p_info = sub.add_parser("info", help="Show info about an indexed file or list files by tag")
     p_info.add_argument(
         "file",
-        type=Path,
+        type=str,
         nargs="?",
         default=None,
-        help="Path to the indexed file (omit when using --tag)",
+        help='Filename patter to the indexed file (e.g. "~/name*/*.md")',
     )
     p_info.add_argument(
         "-t",
@@ -154,24 +154,11 @@ def main(argv: list[str] | None = None) -> None:
             if not results:
                 print(f"No records found with tag: {args.tag}")
                 return
-            if args.format == "json":
-                print(json.dumps([asdict(r) for r in results], indent=2))
-            else:
-                for r in results:
-                    print("-" * 20)
-                    for k, v in asdict(r).items():
-                        print(f"{k}: {v or '-'}")
-                    print()
+            print_info(results, args.format)
         else:
-            if args.file is None:
-                print("Error: 'file' argument is required when not using --tag")
-                return
-            fi = info_by_file(index_dir, args.file.expanduser())
-            if args.format == "json":
-                print(json.dumps(asdict(fi), indent=2))
-            else:
-                for k, v in asdict(fi).items():
-                    print(f"{k}: {v or '-'}")
+            file = str(Path(args.file).expanduser().absolute()) if args.file else None
+            results = info_by_file(index_dir, file)
+            print_info(results, args.format)
 
     elif args.command == "search":
         results = search(index_dir, args.query, tag=args.tag, limit=args.limit)

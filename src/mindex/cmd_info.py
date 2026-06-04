@@ -1,6 +1,7 @@
 """Info command: show metadata about indexed files."""
 
-from dataclasses import dataclass
+import json
+from dataclasses import asdict, dataclass
 from pathlib import Path
 
 
@@ -15,30 +16,37 @@ class FileInfo:
     tag: str
 
 
-def info_by_file(index_dir: Path, file_path: Path) -> FileInfo:
-    """Return basic info about an indexed file record.
+def info_by_file(index_dir: Path, file: str | None = None) -> list[FileInfo]:
+    """Return basic info about indexed file(s).
 
     Args:
         index_dir: Path to the index directory.
-        file_path: Path to the indexed file.
+        file: Optional path or wildcard pattern to match indexed files.
+                   If None, returns all indexed files.
+                   Supports glob-style wildcards (e.g. "*.md", "docs/*").
 
     Returns:
-        FileInfo with path, size, updated_at, and tag.
+        list[FileInfo] of matching records.
 
     Raises:
-        FileNotFoundError: If the file is not found in the index.
+        FileNotFoundError: If file_path is provided but no records match.
     """
     with _db(index_dir) as conn:
-        row = conn.execute(
-            "SELECT path, size, updated_at, tag FROM docs WHERE path = ?",
-            (str(file_path.absolute()),),
-        ).fetchone()
-
-        if not row:
-            raise FileNotFoundError(f"File not indexed: {file_path}")
-
-        return FileInfo(**row)
-
+        if file is not None:
+            file = str(file)
+            # relative wildcards should match stored absolute paths
+            if not file.startswith("/"):
+                file = "*/" + file
+        else:
+            file = "*"
+        rows = conn.execute(
+            "SELECT path, size, updated_at, tag FROM docs WHERE path GLOB ?",
+            (file, )
+        ).fetchall()
+        result = [FileInfo(**row) for row in rows]
+        if not result and file != "*":
+            raise FileNotFoundError("No indexed files matched the given pattern.")
+        return result
 
 def info_by_tag(index_dir: Path, tag: str) -> list[FileInfo]:
     """Return info for all indexed files with the given tag.
@@ -57,3 +65,26 @@ def info_by_tag(index_dir: Path, tag: str) -> list[FileInfo]:
         ).fetchall()
 
         return [FileInfo(**row) for row in rows]
+
+
+def print_info(results: list[FileInfo], fmt: str = "json") -> None:
+    """Print a list of FileInfo records in the given format.
+
+    Args:
+        results: List of FileInfo records to print.
+        fmt: Output format — "json" or "text" (default: "json").
+    """
+    if not results:
+        if fmt == "json":
+            print("[]")
+        else:
+            print("No records found.")
+        return
+    if fmt == "json":
+        print(json.dumps([asdict(r) for r in results], indent=2))
+    else:
+        for r in results:
+            print("-" * 20)
+            for k, v in asdict(r).items():
+                print(f"{k}: {v or '-'}")
+            print()

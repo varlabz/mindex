@@ -411,12 +411,14 @@ class TestCLIInfoPositive:
 
         out = _run(["info", str(test_file)], index_dir, capfd)
         result = json.loads(out)
-        assert "path" in result
-        assert "size" in result
-        assert "updated_at" in result
-        assert "tag" in result
-        assert result["size"] == len("some content here")
-        assert result["tag"] is None
+        assert isinstance(result, list)
+        assert len(result) == 1
+        assert "path" in result[0]
+        assert "size" in result[0]
+        assert "updated_at" in result[0]
+        assert "tag" in result[0]
+        assert result[0]["size"] == len("some content here")
+        assert result[0]["tag"] is None
 
     def test_info_text_output(self, index_dir: Path, capfd: pytest.CaptureFixture[str]):
         """Test that info command with --format text outputs labeled fields."""
@@ -438,7 +440,9 @@ class TestCLIInfoPositive:
 
         out = _run(["info", str(test_file)], index_dir, capfd)
         result = json.loads(out)
-        assert result["tag"] == "wiki"
+        assert isinstance(result, list)
+        assert len(result) == 1
+        assert result[0]["tag"] == "wiki"
 
     def test_info_text_shows_dash_for_missing_tag(
         self, index_dir: Path, capfd: pytest.CaptureFixture[str]
@@ -513,10 +517,10 @@ class TestCLIInfoNegative:
         with pytest.raises(FileNotFoundError):
             _run(["info", str(test_file)], index_dir, capfd)
 
-    def test_info_missing_file_argument(self, index_dir: Path, capfd: pytest.CaptureFixture[str]):
-        """Test that info command prints error when no file or --tag is provided."""
+    def test_info_no_args_prints_all(self, index_dir: Path, capfd: pytest.CaptureFixture[str]):
+        """Test that info with no file or --tag prints all indexed files."""
         out = _run(["info"], index_dir, capfd)
-        assert "Error: 'file' argument is required when not using --tag" in out
+        assert out.strip() == "[]"
 
 
 class TestCLIEdgeCases:
@@ -859,9 +863,7 @@ class TestCLILintEdgeCases:
         assert len(results) == 1
         assert "inside.md" in results[0]["path"]
 
-    def test_lint_mixed_ok_and_missing(
-        self, index_dir: Path, capfd: pytest.CaptureFixture[str]
-    ):
+    def test_lint_mixed_ok_and_missing(self, index_dir: Path, capfd: pytest.CaptureFixture[str]):
         """Test lint with a mix of existing and missing files."""
         f1 = index_dir / "exists.md"
         f1.write_text("Exists.", encoding="utf-8")
@@ -879,9 +881,7 @@ class TestCLILintEdgeCases:
         assert "OK" in statuses
         assert "missing" in statuses
 
-    def test_lint_special_chars_in_path(
-        self, index_dir: Path, capfd: pytest.CaptureFixture[str]
-    ):
+    def test_lint_special_chars_in_path(self, index_dir: Path, capfd: pytest.CaptureFixture[str]):
         """Test lint with file containing special characters in name."""
         f = index_dir / "test-file_v2.0 (draft).md"
         f.write_text("Special name content.", encoding="utf-8")
@@ -932,9 +932,7 @@ class TestCLILintFixPositive:
         data = json.loads(results)
         assert len(data) == 1
 
-    def test_lint_fix_removes_all_missing(
-        self, index_dir: Path, capfd: pytest.CaptureFixture[str]
-    ):
+    def test_lint_fix_removes_all_missing(self, index_dir: Path, capfd: pytest.CaptureFixture[str]):
         """Test that lint --fix removes all missing records."""
         for name in ["a.md", "b.md", "c.md"]:
             f = index_dir / name
@@ -1053,9 +1051,7 @@ class TestCLILintFixPositive:
         assert len(data) == 1
         assert data[0]["path"] == str(alive.absolute())
 
-    def test_lint_fix_with_tagged_files(
-        self, index_dir: Path, capfd: pytest.CaptureFixture[str]
-    ):
+    def test_lint_fix_with_tagged_files(self, index_dir: Path, capfd: pytest.CaptureFixture[str]):
         """Test that lint --fix works with tagged files."""
         f1 = index_dir / "tagged_gone.md"
         f1.write_text("Tagged.", encoding="utf-8")
@@ -1077,16 +1073,12 @@ class TestCLILintFixPositive:
 class TestCLILintFixNegative:
     """Negative tests for CLI 'lint --fix' command."""
 
-    def test_lint_fix_empty_index(
-        self, index_dir: Path, capfd: pytest.CaptureFixture[str]
-    ):
+    def test_lint_fix_empty_index(self, index_dir: Path, capfd: pytest.CaptureFixture[str]):
         """Test that lint --fix does nothing when index is empty."""
         out = _run(["lint", "--fix"], index_dir, capfd)
         assert "No missing records" in out
 
-    def test_lint_fix_no_missing_records(
-        self, index_dir: Path, capfd: pytest.CaptureFixture[str]
-    ):
+    def test_lint_fix_no_missing_records(self, index_dir: Path, capfd: pytest.CaptureFixture[str]):
         """Test that lint --fix does nothing when all files exist."""
         f = index_dir / "intact.md"
         f.write_text("Intact.", encoding="utf-8")
@@ -1106,9 +1098,7 @@ class TestCLILintFixNegative:
         out = _run(["lint", "--fix", "/nonexistent/path/xyz"], index_dir, capfd)
         assert "No missing records" in out
 
-    def test_lint_fix_with_invalid_format(
-        self, index_dir: Path, capfd: pytest.CaptureFixture[str]
-    ):
+    def test_lint_fix_with_invalid_format(self, index_dir: Path, capfd: pytest.CaptureFixture[str]):
         """Test that lint --fix with invalid format raises an error."""
         with pytest.raises(SystemExit):
             _run(["lint", "--fix", "--format", "xml"], index_dir, capfd)
@@ -1209,9 +1199,7 @@ class TestCLILintFixEdgeCases:
         out = _run(["lint", "--fix", str(vault)], index_dir, capfd)
         assert "Deleted 1 missing record(s)." in out
 
-    def test_lint_fix_with_spaces_in_path(
-        self, index_dir: Path, capfd: pytest.CaptureFixture[str]
-    ):
+    def test_lint_fix_with_spaces_in_path(self, index_dir: Path, capfd: pytest.CaptureFixture[str]):
         """Test lint --fix with file containing spaces in name."""
         f = index_dir / "my file name.md"
         f.write_text("Spaces.", encoding="utf-8")
@@ -1221,9 +1209,7 @@ class TestCLILintFixEdgeCases:
         out = _run(["lint", "--fix"], index_dir, capfd)
         assert "Deleted 1 missing record(s)." in out
 
-    def test_lint_fix_lints_before_fixing(
-        self, index_dir: Path, capfd: pytest.CaptureFixture[str]
-    ):
+    def test_lint_fix_lints_before_fixing(self, index_dir: Path, capfd: pytest.CaptureFixture[str]):
         """Test that lint --fix does not output lint results, just fix summary."""
         f = index_dir / "gone.md"
         f.write_text("Gone.", encoding="utf-8")

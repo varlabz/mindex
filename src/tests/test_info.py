@@ -36,34 +36,35 @@ class TestInfoPositive:
     """Positive test cases for info."""
 
     def test_info_returns_file_info(self, index_dir: Path, indexed_file: Path):
-        """Test that info returns a FileInfo object with correct fields."""
+        """Test that info returns a list of FileInfo objects with correct fields."""
         fi = info_by_file(index_dir, indexed_file)
-        assert isinstance(fi, FileInfo)
-        assert fi.path == str(indexed_file.absolute())
-        assert fi.size > 0
-        assert fi.updated_at is not None
-        assert isinstance(fi.updated_at, str)
+        assert isinstance(fi, list)
+        assert len(fi) == 1
+        assert fi[0].path == str(indexed_file.absolute())
+        assert fi[0].size > 0
+        assert fi[0].updated_at is not None
+        assert isinstance(fi[0].updated_at, str)
 
     def test_info_returns_size_correctly(self, index_dir: Path, indexed_file: Path):
         """Test that info returns the correct file size."""
         content = indexed_file.read_text(encoding="utf-8")
         fi = info_by_file(index_dir, indexed_file)
-        assert fi.size == len(content)
+        assert fi[0].size == len(content)
 
     def test_info_returns_none_tag_when_not_set(self, index_dir: Path, indexed_file: Path):
         """Test that info returns None for tag when no tag was set."""
         fi = info_by_file(index_dir, indexed_file)
-        assert fi.tag is None
+        assert fi[0].tag is None
 
     def test_info_returns_tag_when_set(self, index_dir: Path, indexed_file_with_tag: Path):
         """Test that info returns the correct tag."""
         fi = info_by_file(index_dir, indexed_file_with_tag)
-        assert fi.tag == "article"
+        assert fi[0].tag == "article"
 
     def test_info_returns_absolute_path(self, index_dir: Path, indexed_file: Path):
         """Test that info returns the absolute path."""
         fi = info_by_file(index_dir, indexed_file)
-        assert fi.path.startswith("/")
+        assert fi[0].path.startswith("/")
 
     def test_info_empty_file(self, index_dir: Path):
         """Test info on an empty indexed file."""
@@ -71,7 +72,7 @@ class TestInfoPositive:
         file_path.write_text("", encoding="utf-8")
         add_file(index_dir, file_path)
         fi = info_by_file(index_dir, file_path)
-        assert fi.size == 0
+        assert fi[0].size == 0
 
     def test_info_large_file(self, index_dir: Path):
         """Test info on a large indexed file."""
@@ -80,7 +81,7 @@ class TestInfoPositive:
         file_path.write_text(content, encoding="utf-8")
         add_file(index_dir, file_path)
         fi = info_by_file(index_dir, file_path)
-        assert fi.size == 100_000
+        assert fi[0].size == 100_000
 
 
 class TestInfoNegative:
@@ -89,15 +90,20 @@ class TestInfoNegative:
     def test_info_file_not_indexed(self, index_dir: Path):
         """Test that info raises FileNotFoundError for non-indexed files."""
         file_path = index_dir / "nonexistent.md"
-        with pytest.raises(FileNotFoundError, match="File not indexed"):
+        with pytest.raises(FileNotFoundError, match="No indexed files matched"):
             info_by_file(index_dir, file_path)
 
     def test_info_file_exists_but_not_indexed(self, index_dir: Path):
         """Test info raises FileNotFoundError for unindexed files."""
         file_path = index_dir / "not_indexed.md"
         file_path.write_text("I exist but am not indexed.", encoding="utf-8")
-        with pytest.raises(FileNotFoundError, match="File not indexed"):
+        with pytest.raises(FileNotFoundError, match="No indexed files matched"):
             info_by_file(index_dir, file_path)
+
+    def test_info_no_matching_wildcard(self, index_dir: Path):
+        """Test that info raises FileNotFoundError when wildcard matches nothing."""
+        with pytest.raises(FileNotFoundError, match="No indexed files matched"):
+            info_by_file(index_dir, Path("*.nonexistent"))
 
 
 class TestInfoEdgeCases:
@@ -109,7 +115,7 @@ class TestInfoEdgeCases:
         file_path.write_text("Special name content.", encoding="utf-8")
         add_file(index_dir, file_path)
         fi = info_by_file(index_dir, file_path)
-        assert fi.size == len("Special name content.")
+        assert fi[0].size == len("Special name content.")
 
     def test_info_file_with_unicode_content(self, index_dir: Path):
         """Test info on a file with unicode content."""
@@ -118,7 +124,59 @@ class TestInfoEdgeCases:
         file_path.write_text(content, encoding="utf-8")
         add_file(index_dir, file_path)
         fi = info_by_file(index_dir, file_path)
-        assert fi.size == len(content)
+        assert fi[0].size == len(content)
+
+
+class TestInfoOptionalFile:
+    """Tests for optional file_path parameter."""
+
+    def test_info_all_files_when_none(self, index_dir: Path):
+        """Test that info_by_file returns all files when file_path is None."""
+        for i in range(3):
+            file_path = index_dir / f"file_{i}.md"
+            file_path.write_text(f"Content {i}", encoding="utf-8")
+            add_file(index_dir, file_path)
+        results = info_by_file(index_dir, None)
+        assert isinstance(results, list)
+        assert len(results) == 3
+
+    def test_info_single_match_returns_list(self, index_dir: Path, indexed_file: Path):
+        """Test that info_by_file returns a list even for a single match."""
+        result = info_by_file(index_dir, indexed_file)
+        assert isinstance(result, list)
+        assert len(result) == 1
+        assert result[0].path == str(indexed_file.absolute())
+
+    def test_info_wildcard_multiple_matches(self, index_dir: Path):
+        """Test that info_by_file with wildcard returns list when multiple match."""
+        for i in range(3):
+            file_path = index_dir / f"wildcard_{i}.md"
+            file_path.write_text(f"Content {i}", encoding="utf-8")
+            add_file(index_dir, file_path)
+        results = info_by_file(index_dir, Path("wildcard_*.md"))
+        assert isinstance(results, list)
+        assert len(results) == 3
+
+    def test_info_wildcard_single_match(self, index_dir: Path, indexed_file: Path):
+        """Test that info_by_file with wildcard returns list even for one match."""
+        result = info_by_file(index_dir, Path("test.md"))
+        assert isinstance(result, list)
+        assert len(result) == 1
+        assert result[0].path == str(indexed_file.absolute())
+
+    def test_info_mixed_tags_all(self, index_dir: Path):
+        """Test that info_by_file(None) returns files with and without tags."""
+        (index_dir / "a.md").write_text("Content a", encoding="utf-8")
+        (index_dir / "b.md").write_text("Content b", encoding="utf-8")
+        (index_dir / "c.md").write_text("Content c", encoding="utf-8")
+        add_file(index_dir, index_dir / "a.md")
+        add_file(index_dir, index_dir / "b.md", tag="article")
+        add_file(index_dir, index_dir / "c.md")
+        results = info_by_file(index_dir, None)
+        assert len(results) == 3
+        tags = {r.tag for r in results}
+        assert None in tags
+        assert "article" in tags
 
 
 class TestInfoByTagPositive:
@@ -207,5 +265,5 @@ class TestInfoByTagEdgeCases:
         add_file(index_dir, file_path)
         fi2 = info_by_file(index_dir, file_path)
 
-        assert fi2.size > fi1.size
-        assert fi2.size == len("This is much longer content now.")
+        assert fi2[0].size > fi1[0].size
+        assert fi2[0].size == len("This is much longer content now.")

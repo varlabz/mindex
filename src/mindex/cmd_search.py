@@ -10,7 +10,6 @@ from mindex.db import _db
 class SearchResult:
     path: str
     snippet: str
-    tag: str
     updated_at: str
 
 
@@ -39,7 +38,7 @@ def search(index_dir: Path, query: str, file_path: str = "", limit: int = 10) ->
         sql = """
             SELECT d.path,
                    snippet(docs_fts, 0, '', '', '...', 64) as snippet,
-                   d.tag, d.updated_at
+                   d.updated_at
             FROM docs_fts
             JOIN docs d ON docs_fts.rowid = d.id
             WHERE docs_fts MATCH ?

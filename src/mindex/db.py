@@ -36,7 +36,6 @@ CREATE TABLE IF NOT EXISTS docs (
     content TEXT NOT NULL,
     size INTEGER DEFAULT 0,
     hash TEXT,
-    tag TEXT COLLATE NOCASE,
     updated_at TEXT DEFAULT (datetime('now'))
 );
 

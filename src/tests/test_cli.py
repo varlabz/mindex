@@ -893,6 +893,348 @@ class TestCLILintEdgeCases:
         assert results[0]["status"] == "OK"
 
 
+class TestCLILintFixPositive:
+    """Positive tests for CLI 'lint --fix' command."""
+
+    def test_lint_fix_removes_missing_records(
+        self, index_dir: Path, capfd: pytest.CaptureFixture[str]
+    ):
+        """Test that lint --fix removes records for deleted files."""
+        f1 = index_dir / "exists.md"
+        f1.write_text("Exists.", encoding="utf-8")
+        main(["--index-dir", str(index_dir), "add", str(f1)])
+
+        f2 = index_dir / "gone.md"
+        f2.write_text("Gone.", encoding="utf-8")
+        main(["--index-dir", str(index_dir), "add", str(f2)])
+        f2.unlink()
+
+        out = _run(["lint", "--fix"], index_dir, capfd)
+        assert "Deleted 1 missing record(s)." in out
+
+        results = _run(["lint"], index_dir, capfd)
+        data = json.loads(results)
+        assert len(data) == 1
+        assert data[0]["path"] == str(f1.absolute())
+
+    def test_lint_fix_keeps_existing_records(
+        self, index_dir: Path, capfd: pytest.CaptureFixture[str]
+    ):
+        """Test that lint --fix does not remove records for existing files."""
+        f = index_dir / "intact.md"
+        f.write_text("Intact.", encoding="utf-8")
+        main(["--index-dir", str(index_dir), "add", str(f)])
+
+        out = _run(["lint", "--fix"], index_dir, capfd)
+        assert "No missing records" in out
+
+        results = _run(["lint"], index_dir, capfd)
+        data = json.loads(results)
+        assert len(data) == 1
+
+    def test_lint_fix_removes_all_missing(
+        self, index_dir: Path, capfd: pytest.CaptureFixture[str]
+    ):
+        """Test that lint --fix removes all missing records."""
+        for name in ["a.md", "b.md", "c.md"]:
+            f = index_dir / name
+            f.write_text("content", encoding="utf-8")
+            main(["--index-dir", str(index_dir), "add", str(f)])
+            f.unlink()
+
+        out = _run(["lint", "--fix"], index_dir, capfd)
+        assert "Deleted 3 missing record(s)." in out
+
+        results = _run(["lint"], index_dir, capfd)
+        assert "No indexed files." in results
+
+    def test_lint_fix_with_file_dir_removes_subset(
+        self, index_dir: Path, capfd: pytest.CaptureFixture[str]
+    ):
+        """Test that lint --fix with file_dir only removes records under that directory."""
+        vault = index_dir / "vault"
+        vault.mkdir()
+
+        inside = vault / "gone.md"
+        inside.write_text("Gone.", encoding="utf-8")
+        main(["--index-dir", str(index_dir), "add", str(inside)])
+        inside.unlink()
+
+        outside = index_dir / "outside.md"
+        outside.write_text("Outside.", encoding="utf-8")
+        main(["--index-dir", str(index_dir), "add", str(outside)])
+        outside.unlink()
+
+        out = _run(["lint", "--fix", str(vault)], index_dir, capfd)
+        assert "Deleted 1 missing record(s)." in out
+
+        results = _run(["lint"], index_dir, capfd)
+        data = json.loads(results)
+        # inside.md should be gone, outside.md should still be indexed
+        assert len(data) == 1
+        assert data[0]["path"] == str(outside.absolute())
+
+    def test_lint_fix_with_file_dir_preserves_other_dir(
+        self, index_dir: Path, capfd: pytest.CaptureFixture[str]
+    ):
+        """Test that lint --fix with file_dir does not touch files outside it."""
+        vault = index_dir / "vault"
+        vault.mkdir()
+
+        inside = vault / "gone.md"
+        inside.write_text("Gone.", encoding="utf-8")
+        main(["--index-dir", str(index_dir), "add", str(inside)])
+        inside.unlink()
+
+        # File outside vault that is also missing
+        outside = index_dir / "outside.md"
+        outside.write_text("Outside.", encoding="utf-8")
+        main(["--index-dir", str(index_dir), "add", str(outside)])
+        outside.unlink()
+
+        _run(["lint", "--fix", str(vault)], index_dir, capfd)
+
+        results = _run(["lint"], index_dir, capfd)
+        data = json.loads(results)
+        # outside.md should still be indexed since it's outside file_dir
+        assert len(data) == 1
+        assert data[0]["path"] == str(outside.absolute())
+        assert data[0]["status"] == "missing"
+
+    def test_lint_fix_preserves_existing_in_other_dir(
+        self, index_dir: Path, capfd: pytest.CaptureFixture[str]
+    ):
+        """Test that lint --fix with file_dir keeps existing files outside it."""
+        vault = index_dir / "vault"
+        vault.mkdir()
+
+        # Add a file inside vault (will be deleted)
+        inside = vault / "gone.md"
+        inside.write_text("Gone.", encoding="utf-8")
+        main(["--index-dir", str(index_dir), "add", str(inside)])
+        inside.unlink()
+
+        # Add a file outside vault (will also be deleted)
+        outside = index_dir / "outside.md"
+        outside.write_text("Outside.", encoding="utf-8")
+        main(["--index-dir", str(index_dir), "add", str(outside)])
+        outside.unlink()
+
+        _run(["lint", "--fix", str(vault)], index_dir, capfd)
+
+        results = _run(["lint"], index_dir, capfd)
+        data = json.loads(results)
+        assert len(data) == 1
+        assert data[0]["path"] == str(outside.absolute())
+
+    def test_lint_fix_nested_files_under_file_dir(
+        self, index_dir: Path, capfd: pytest.CaptureFixture[str]
+    ):
+        """Test that lint --fix removes nested files when under file_dir."""
+        vault = index_dir / "vault"
+        vault.mkdir()
+        sub = vault / "sub"
+        sub.mkdir()
+
+        nested = sub / "gone.md"
+        nested.write_text("Gone.", encoding="utf-8")
+        main(["--index-dir", str(index_dir), "add", str(nested)])
+        nested.unlink()
+
+        alive = vault / "alive.md"
+        alive.write_text("Alive.", encoding="utf-8")
+        main(["--index-dir", str(index_dir), "add", str(alive)])
+
+        out = _run(["lint", "--fix", str(vault)], index_dir, capfd)
+        assert "Deleted 1 missing record(s)." in out
+
+        results = _run(["lint", str(vault)], index_dir, capfd)
+        data = json.loads(results)
+        assert len(data) == 1
+        assert data[0]["path"] == str(alive.absolute())
+
+    def test_lint_fix_with_tagged_files(
+        self, index_dir: Path, capfd: pytest.CaptureFixture[str]
+    ):
+        """Test that lint --fix works with tagged files."""
+        f1 = index_dir / "tagged_gone.md"
+        f1.write_text("Tagged.", encoding="utf-8")
+        main(["--index-dir", str(index_dir), "add", str(f1), "--tag", "wiki"])
+        f1.unlink()
+
+        f2 = index_dir / "tagged_alive.md"
+        f2.write_text("Tagged.", encoding="utf-8")
+        main(["--index-dir", str(index_dir), "add", str(f2), "--tag", "wiki"])
+
+        _run(["lint", "--fix"], index_dir, capfd)
+
+        results = _run(["info", "--tag", "wiki"], index_dir, capfd)
+        data = json.loads(results)
+        assert len(data) == 1
+        assert data[0]["path"] == str(f2.absolute())
+
+
+class TestCLILintFixNegative:
+    """Negative tests for CLI 'lint --fix' command."""
+
+    def test_lint_fix_empty_index(
+        self, index_dir: Path, capfd: pytest.CaptureFixture[str]
+    ):
+        """Test that lint --fix does nothing when index is empty."""
+        out = _run(["lint", "--fix"], index_dir, capfd)
+        assert "No missing records" in out
+
+    def test_lint_fix_no_missing_records(
+        self, index_dir: Path, capfd: pytest.CaptureFixture[str]
+    ):
+        """Test that lint --fix does nothing when all files exist."""
+        f = index_dir / "intact.md"
+        f.write_text("Intact.", encoding="utf-8")
+        main(["--index-dir", str(index_dir), "add", str(f)])
+
+        out = _run(["lint", "--fix"], index_dir, capfd)
+        assert "No missing records" in out
+
+    def test_lint_fix_with_nonexistent_file_dir(
+        self, index_dir: Path, capfd: pytest.CaptureFixture[str]
+    ):
+        """Test that lint --fix with non-existent file_dir does not crash."""
+        f = index_dir / "test.md"
+        f.write_text("Test.", encoding="utf-8")
+        main(["--index-dir", str(index_dir), "add", str(f)])
+
+        out = _run(["lint", "--fix", "/nonexistent/path/xyz"], index_dir, capfd)
+        assert "No missing records" in out
+
+    def test_lint_fix_with_invalid_format(
+        self, index_dir: Path, capfd: pytest.CaptureFixture[str]
+    ):
+        """Test that lint --fix with invalid format raises an error."""
+        with pytest.raises(SystemExit):
+            _run(["lint", "--fix", "--format", "xml"], index_dir, capfd)
+
+
+class TestCLILintFixEdgeCases:
+    """Edge case tests for CLI 'lint --fix' command."""
+
+    def test_lint_fix_file_with_special_chars(
+        self, index_dir: Path, capfd: pytest.CaptureFixture[str]
+    ):
+        """Test lint --fix on a file with special characters in its name."""
+        f = index_dir / "test-file_v2.0 (draft).md"
+        f.write_text("Special name.", encoding="utf-8")
+        main(["--index-dir", str(index_dir), "add", str(f)])
+        f.unlink()
+
+        out = _run(["lint", "--fix"], index_dir, capfd)
+        assert "Deleted 1 missing record(s)." in out
+
+    def test_lint_fix_unicode_content_file(
+        self, index_dir: Path, capfd: pytest.CaptureFixture[str]
+    ):
+        """Test lint --fix on a file with unicode content that was deleted."""
+        f = index_dir / "unicode.md"
+        f.write_text("こんにちは世界 🌍", encoding="utf-8")
+        main(["--index-dir", str(index_dir), "add", str(f)])
+        f.unlink()
+
+        out = _run(["lint", "--fix"], index_dir, capfd)
+        assert "Deleted 1 missing record(s)." in out
+
+    def test_lint_fix_same_file_added_twice_deleted(
+        self, index_dir: Path, capfd: pytest.CaptureFixture[str]
+    ):
+        """Test lint --fix when the same file was indexed twice and is deleted."""
+        f = index_dir / "duplicate.md"
+        f.write_text("Duplicate.", encoding="utf-8")
+        main(["--index-dir", str(index_dir), "add", str(f)])
+        main(["--index-dir", str(index_dir), "add", str(f)])
+        f.unlink()
+
+        out = _run(["lint", "--fix"], index_dir, capfd)
+        assert "Deleted 1 missing record(s)." in out
+
+        results = _run(["lint"], index_dir, capfd)
+        assert "No indexed files." in results
+
+    def test_lint_fix_large_number_of_missing(
+        self, index_dir: Path, capfd: pytest.CaptureFixture[str]
+    ):
+        """Test lint --fix with a large number of missing records."""
+        for i in range(50):
+            f = index_dir / f"file_{i:03d}.md"
+            f.write_text(f"Content {i}", encoding="utf-8")
+            main(["--index-dir", str(index_dir), "add", str(f)])
+            f.unlink()
+
+        out = _run(["lint", "--fix"], index_dir, capfd)
+        assert "Deleted 50 missing record(s)." in out
+
+        results = _run(["lint"], index_dir, capfd)
+        assert "No indexed files." in results
+
+    def test_lint_fix_mixed_existing_and_missing(
+        self, index_dir: Path, capfd: pytest.CaptureFixture[str]
+    ):
+        """Test lint --fix with a mix of existing and missing files."""
+        for i in range(20):
+            f = index_dir / f"file_{i:03d}.md"
+            f.write_text(f"Content {i}", encoding="utf-8")
+            main(["--index-dir", str(index_dir), "add", str(f)])
+
+        # Delete even-numbered files
+        for i in range(0, 20, 2):
+            (index_dir / f"file_{i:03d}.md").unlink()
+
+        out = _run(["lint", "--fix"], index_dir, capfd)
+        assert "Deleted 10 missing record(s)." in out
+
+        results = _run(["lint"], index_dir, capfd)
+        data = json.loads(results)
+        assert len(data) == 10
+        assert all(r["status"] == "OK" for r in data)
+
+    def test_lint_fix_file_dir_with_trailing_slash(
+        self, index_dir: Path, capfd: pytest.CaptureFixture[str]
+    ):
+        """Test lint --fix works correctly with file_dir."""
+        vault = index_dir / "vault"
+        vault.mkdir()
+
+        f = vault / "gone.md"
+        f.write_text("Gone.", encoding="utf-8")
+        main(["--index-dir", str(index_dir), "add", str(f)])
+        f.unlink()
+
+        out = _run(["lint", "--fix", str(vault)], index_dir, capfd)
+        assert "Deleted 1 missing record(s)." in out
+
+    def test_lint_fix_with_spaces_in_path(
+        self, index_dir: Path, capfd: pytest.CaptureFixture[str]
+    ):
+        """Test lint --fix with file containing spaces in name."""
+        f = index_dir / "my file name.md"
+        f.write_text("Spaces.", encoding="utf-8")
+        main(["--index-dir", str(index_dir), "add", str(f)])
+        f.unlink()
+
+        out = _run(["lint", "--fix"], index_dir, capfd)
+        assert "Deleted 1 missing record(s)." in out
+
+    def test_lint_fix_lints_before_fixing(
+        self, index_dir: Path, capfd: pytest.CaptureFixture[str]
+    ):
+        """Test that lint --fix does not output lint results, just fix summary."""
+        f = index_dir / "gone.md"
+        f.write_text("Gone.", encoding="utf-8")
+        main(["--index-dir", str(index_dir), "add", str(f)])
+        f.unlink()
+
+        out = _run(["lint", "--fix"], index_dir, capfd)
+        assert "Deleted 1 missing record(s)." in out
+        assert "path:" not in out
+
+
 class TestCLIOptionsPositive:
     """Positive tests for global CLI options."""
 

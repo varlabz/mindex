@@ -6,7 +6,7 @@ from pathlib import Path
 from mindex.cmd_add_file import add_file
 from mindex.cmd_del_file import del_file
 from mindex.cmd_info import info_by_file, info_by_tag
-from mindex.cmd_lint import lint, lint_output
+from mindex.cmd_lint import lint, lint_fix, lint_output
 from mindex.cmd_read_file import read_file
 from mindex.cmd_search import search
 from mindex.cmd_search_file import search_file
@@ -106,6 +106,12 @@ def main(argv: list[str] | None = None) -> None:
         default="json",
         help="Output format (default: json)",
     )
+    p_lint.add_argument(
+        "--fix",
+        action="store_true",
+        default=False,
+        help="Delete records for files that no longer exist on disk",
+    )
 
     # file
     p_sf = sub.add_parser("file", help="Search within a specific indexed file")
@@ -195,8 +201,11 @@ def main(argv: list[str] | None = None) -> None:
 
     elif args.command == "lint":
         file_dir = args.file_dir.expanduser() if args.file_dir else None
-        results = lint(index_dir, file_dir)
-        lint_output(results, args.format)
+        if args.fix:
+            lint_fix(index_dir, file_dir)
+        else:
+            results = lint(index_dir, file_dir)
+            lint_output(results, args.format)
 
 
 if __name__ == "__main__":

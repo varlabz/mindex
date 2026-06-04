@@ -43,6 +43,36 @@ def lint(index_dir: Path, file_dir: Path | None = None) -> list[LintInfo]:
     return results
 
 
+def lint_fix(index_dir: Path, file_dir: Path | None = None) -> None:
+    """Delete indexed records whose files no longer exist on disk.
+
+    Args:
+        index_dir: Path to the index directory.
+        file_dir: Optional directory to filter records by. Only records whose
+            path starts with this directory are considered for deletion.
+    """
+    prefix = str((file_dir / "").absolute()) if file_dir is not None else None
+    deleted = 0
+    with _db(index_dir) as conn:
+        if prefix:
+            rows = conn.execute(
+                "SELECT path FROM docs WHERE SUBSTR(path, 1, LENGTH(?)) = ?",
+                (prefix, prefix),
+            ).fetchall()
+        else:
+            rows = conn.execute("SELECT path FROM docs").fetchall()
+        for row in rows:
+            file_path = Path(row["path"])
+            if not file_path.is_file():
+                conn.execute("DELETE FROM docs WHERE path = ?", (str(file_path.absolute()),))
+                deleted += 1
+        conn.commit()
+    if deleted:
+        print(f"Deleted {deleted} missing record(s).")
+    else:
+        print("No missing records to delete.")
+
+
 def lint_output(results: list[LintInfo], fmt: str) -> None:
     """Print lint results in the specified format.
 

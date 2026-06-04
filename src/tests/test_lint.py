@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from mindex.cmd_lint import LintInfo, lint
+from mindex.cmd_lint import LintInfo, lint, lint_fix
 from mindex.cmd_add_file import add_file
 
 
@@ -222,3 +222,238 @@ class TestLintEdgeCases:
         missing = [r for r in results if r.path == str(file_path.absolute())]
         assert len(missing) == 1
         assert missing[0].status == "missing"
+
+
+# ── lint_fix Tests ─────────────────────────────────────────────────────
+
+
+class TestLintFixPositive:
+    """Positive test cases for lint_fix."""
+
+    def test_lint_fix_removes_missing_records(
+        self, index_dir: Path, file_dir: Path, indexed_files: dict[str, Path]
+    ):
+        """Test that lint_fix removes records for files that no longer exist."""
+        # Delete one file
+        indexed_files["file1.md"].unlink()
+
+        lint_fix(index_dir)
+
+        results = lint(index_dir)
+        paths = {r.path for r in results}
+        assert str(indexed_files["file1.md"].absolute()) not in paths
+        assert str(indexed_files["file2.md"].absolute()) in paths
+
+    def test_lint_fix_keeps_existing_records(
+        self, index_dir: Path, file_dir: Path, indexed_files: dict[str, Path]
+    ):
+        """Test that lint_fix preserves records for files that still exist."""
+        lint_fix(index_dir)
+
+        results = lint(index_dir)
+        assert len(results) == 3
+        assert all(r.status == "OK" for r in results)
+
+    def test_lint_fix_removes_all_missing(
+        self, index_dir: Path, file_dir: Path, indexed_files: dict[str, Path]
+    ):
+        """Test that lint_fix removes all missing records."""
+        for name in ["file1.md", "file2.md", "sub/nested.md"]:
+            indexed_files[name].unlink()
+
+        lint_fix(index_dir)
+
+        results = lint(index_dir)
+        assert results == []
+
+    def test_lint_fix_with_file_dir_removes_subset(
+        self, index_dir: Path, file_dir: Path, indexed_files: dict[str, Path]
+    ):
+        """Test that lint_fix with file_dir only removes records under that directory."""
+        # Delete a file inside file_dir
+        indexed_files["file1.md"].unlink()
+
+        # Add a file outside file_dir that will also be deleted
+        external = index_dir / "external.md"
+        external.write_text("External.", encoding="utf-8")
+        add_file(index_dir, external)
+        external.unlink()
+
+        lint_fix(index_dir, file_dir)
+
+        # file1.md should be removed (under file_dir)
+        results = lint(index_dir)
+        paths = {r.path for r in results}
+        assert str(indexed_files["file1.md"].absolute()) not in paths
+        # external.md should still exist (outside file_dir)
+        assert str(external.absolute()) in paths
+
+    def test_lint_fix_preserves_existing_in_other_dir(
+        self, index_dir: Path, file_dir: Path, indexed_files: dict[str, Path]
+    ):
+        """Test that lint_fix with file_dir does not touch files outside it."""
+        # Delete a file outside file_dir
+        external = index_dir / "external.md"
+        external.write_text("External.", encoding="utf-8")
+        add_file(index_dir, external)
+        external.unlink()
+
+        lint_fix(index_dir, file_dir)
+
+        results = lint(index_dir)
+        paths = {r.path for r in results}
+        # external.md should still be indexed (not under file_dir)
+        assert str(external.absolute()) in paths
+
+    def test_lint_fix_nested_files_under_file_dir(
+        self, index_dir: Path, file_dir: Path, indexed_files: dict[str, Path]
+    ):
+        """Test that lint_fix removes nested files when under file_dir."""
+        indexed_files["sub/nested.md"].unlink()
+
+        lint_fix(index_dir, file_dir)
+
+        results = lint(index_dir)
+        paths = {r.path for r in results}
+        assert str(indexed_files["sub/nested.md"].absolute()) not in paths
+        assert str(indexed_files["file2.md"].absolute()) in paths
+
+
+# ── lint_fix Negative Tests ────────────────────────────────────────────
+
+
+class TestLintFixNegative:
+    """Negative test cases for lint_fix."""
+
+    def test_lint_fix_no_missing_records(self, index_dir: Path, file_dir: Path):
+        """Test that lint_fix does nothing when there are no missing records."""
+        file_path = file_dir / "intact.md"
+        file_path.write_text("Intact.", encoding="utf-8")
+        add_file(index_dir, file_path)
+
+        lint_fix(index_dir)
+
+        results = lint(index_dir)
+        assert len(results) == 1
+        assert results[0].status == "OK"
+
+    def test_lint_fix_empty_index(self, index_dir: Path):
+        """Test that lint_fix does nothing when index is empty."""
+        lint_fix(index_dir)
+
+        results = lint(index_dir)
+        assert results == []
+
+    def test_lint_fix_with_nonexistent_file_dir(
+        self, index_dir: Path, file_dir: Path
+    ):
+        """Test that lint_fix with a non-existent file_dir does not crash."""
+        file_path = file_dir / "test.md"
+        file_path.write_text("Test.", encoding="utf-8")
+        add_file(index_dir, file_path)
+
+        lint_fix(index_dir, index_dir / "nonexistent")
+
+        results = lint(index_dir)
+        assert len(results) == 1
+
+
+# ── lint_fix Edge Cases ────────────────────────────────────────────────
+
+
+class TestLintFixEdgeCases:
+    """Edge case tests for lint_fix."""
+
+    def test_lint_fix_file_with_special_chars(
+        self, index_dir: Path, file_dir: Path
+    ):
+        """Test lint_fix on a file with special characters in its name."""
+        file_path = file_dir / "test-file_v2.0 (draft).md"
+        file_path.write_text("Special name.", encoding="utf-8")
+        add_file(index_dir, file_path)
+        file_path.unlink()
+
+        lint_fix(index_dir)
+
+        results = lint(index_dir)
+        assert results == []
+
+    def test_lint_fix_unicode_content_file(
+        self, index_dir: Path, file_dir: Path
+    ):
+        """Test lint_fix on a file with unicode content that was deleted."""
+        file_path = file_dir / "unicode.md"
+        file_path.write_text("こんにちは世界 🌍", encoding="utf-8")
+        add_file(index_dir, file_path)
+        file_path.unlink()
+
+        lint_fix(index_dir)
+
+        results = lint(index_dir)
+        assert results == []
+
+    def test_lint_fix_same_file_added_twice_deleted(
+        self, index_dir: Path, file_dir: Path
+    ):
+        """Test lint_fix when the same file was indexed twice and is deleted."""
+        file_path = file_dir / "duplicate.md"
+        file_path.write_text("Duplicate.", encoding="utf-8")
+        add_file(index_dir, file_path)
+        add_file(index_dir, file_path)
+        file_path.unlink()
+
+        lint_fix(index_dir)
+
+        results = lint(index_dir)
+        matching = [r for r in results if "duplicate.md" in r.path]
+        assert len(matching) == 0
+
+    def test_lint_fix_large_number_of_missing(
+        self, index_dir: Path, file_dir: Path
+    ):
+        """Test lint_fix with a large number of missing records."""
+        for i in range(50):
+            file_path = file_dir / f"file_{i:03d}.md"
+            file_path.write_text(f"Content {i}", encoding="utf-8")
+            add_file(index_dir, file_path)
+            file_path.unlink()
+
+        lint_fix(index_dir)
+
+        results = lint(index_dir)
+        assert results == []
+
+    def test_lint_fix_mixed_existing_and_missing(
+        self, index_dir: Path, file_dir: Path
+    ):
+        """Test lint_fix with a mix of existing and missing files."""
+        for i in range(20):
+            file_path = file_dir / f"file_{i:03d}.md"
+            file_path.write_text(f"Content {i}", encoding="utf-8")
+            add_file(index_dir, file_path)
+
+        # Delete odd-numbered files
+        for i in range(0, 20, 2):
+            (file_dir / f"file_{i:03d}.md").unlink()
+
+        lint_fix(index_dir)
+
+        results = lint(index_dir)
+        assert len(results) == 10
+        for r in results:
+            assert r.status == "OK"
+            assert "file_0" in r.path or "file_1" in r.path
+
+    def test_lint_fix_file_dir_with_trailing_slash(
+        self, index_dir: Path, file_dir: Path
+    ):
+        """Test lint_fix works correctly with file_dir."""
+        file_path = file_dir / "test.md"
+        file_path.write_text("Test.", encoding="utf-8")
+        add_file(index_dir, file_path)
+        file_path.unlink()
+
+        lint_fix(index_dir, file_dir)
+
+        results = lint(index_dir)
+        assert results == []

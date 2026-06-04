@@ -5,7 +5,7 @@ from pathlib import Path
 from mindex.db import _db
 
 
-def read_file(index_dir: Path, file_path: Path, start: int, size: int) -> str:
+def read_file(index_dir: Path, file_path: str, start: int, size: int) -> str:
     """Read file content from the index with optional pagination.
 
     Args:
@@ -23,7 +23,7 @@ def read_file(index_dir: Path, file_path: Path, start: int, size: int) -> str:
     with _db(index_dir) as conn:
         row = conn.execute(
             "SELECT content FROM docs WHERE path = ?",
-            (str(file_path.absolute()),),
+            (file_path,),
         ).fetchone()
 
         if not row:

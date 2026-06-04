@@ -47,8 +47,8 @@ def _extract_snippets(highlighted: str, limit: int) -> list[FileSearchResult]:
     return results
 
 
-def search_file(
-    index_dir: Path, file_path: Path, query: str, limit: int = 10
+def file_search(
+    index_dir: Path, file_path: str, query: str, limit: int = 10
 ) -> list[FileSearchResult]:
     """Search within a specific file and return multiple matching snippets.
 
@@ -64,7 +64,7 @@ def search_file(
             JOIN docs d ON docs_fts.rowid = d.id
             WHERE docs_fts MATCH ? AND d.path = ?
             """,
-            (fts_query, str(file_path.absolute())),
+            (fts_query, file_path,),
         ).fetchone()
         if not row or not row["h"]:
             return []

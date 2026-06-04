@@ -13,10 +13,9 @@ class FileInfo:
     path: str
     size: int
     updated_at: str
-    tag: str
 
 
-def info_by_file(index_dir: Path, file: str | None = None) -> list[FileInfo]:
+def info_by_file(index_dir: Path, file_path: str) -> list[FileInfo]:
     """Return basic info about indexed file(s).
 
     Args:
@@ -32,39 +31,12 @@ def info_by_file(index_dir: Path, file: str | None = None) -> list[FileInfo]:
         FileNotFoundError: If file_path is provided but no records match.
     """
     with _db(index_dir) as conn:
-        if file is not None:
-            file = str(file)
-            # relative wildcards should match stored absolute paths
-            if not file.startswith("/"):
-                file = "*/" + file
-        else:
-            file = "*"
         rows = conn.execute(
-            "SELECT path, size, updated_at, tag FROM docs WHERE path GLOB ?",
-            (file, )
+            "SELECT path, size, updated_at, FROM docs WHERE path GLOB ?",
+            (file_path, )
         ).fetchall()
         result = [FileInfo(**row) for row in rows]
-        if not result and file != "*":
-            raise FileNotFoundError("No indexed files matched the given pattern.")
         return result
-
-def info_by_tag(index_dir: Path, tag: str) -> list[FileInfo]:
-    """Return info for all indexed files with the given tag.
-
-    Args:
-        index_dir: Path to the index directory.
-        tag: Tag to filter by.
-
-    Returns:
-        List of FileInfo records matching the tag.
-    """
-    with _db(index_dir) as conn:
-        rows = conn.execute(
-            "SELECT path, size, updated_at, tag FROM docs WHERE tag = ?",
-            (tag,),
-        ).fetchall()
-
-        return [FileInfo(**row) for row in rows]
 
 
 def print_info(results: list[FileInfo], fmt: str = "json", tag: str = None) -> None:

@@ -24,8 +24,8 @@ def _escape_fts5(query: str) -> str:
     return f'"{escaped}"'
 
 
-def search(index_dir: Path, query: str, tag: str = None, limit: int = 10) -> list[SearchResult]:
-    """Search using FTS5, optionally filtering by tag in tag1 field."""
+def search(index_dir: Path, query: str, file_path: str = "", limit: int = 10) -> list[SearchResult]:
+    """Search using FTS5, optionally filtering by file_path (wildcard format) field."""
     stripped = query.strip()
     if not stripped:
         raise ValueError("Query cannot be empty or whitespace only")
@@ -36,20 +36,25 @@ def search(index_dir: Path, query: str, tag: str = None, limit: int = 10) -> lis
         )
 
     with _db(index_dir) as conn:
-        sql = f"""
+        sql = """
             SELECT d.path,
                    snippet(docs_fts, 0, '', '', '...', 64) as snippet,
                    d.tag, d.updated_at
             FROM docs_fts
             JOIN docs d ON docs_fts.rowid = d.id
-            WHERE docs_fts MATCH ? {" AND d.tag = ?" if tag else ""}
-            ORDER BY bm25(docs_fts)
-            LIMIT ?
+            WHERE docs_fts MATCH ?
         """
         fts_query = _escape_fts5(stripped)
-        if tag:
-            rows = conn.execute(sql, (fts_query, tag, limit)).fetchall()
-        else:
-            rows = conn.execute(sql, (fts_query, limit)).fetchall()
+        params: list = [fts_query]
+
+        if file_path:
+            sql += " AND path GLOB ? "
+            params.append(file_path)
+
+        sql += " ORDER BY bm25(docs_fts) "
+        sql += " LIMIT ? "
+        params.append(limit)
+
+        rows = conn.execute(sql, params).fetchall()
 
         return [SearchResult(**row) for row in rows]

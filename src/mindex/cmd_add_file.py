@@ -7,13 +7,13 @@ from pathlib import Path
 from mindex.db import _db
 
 
-def add_file(index_dir: Path, file_path: str | Path, tag: str = None) -> int:
+def add_file(index_dir: Path, file_path: str) -> int:
     """Add or update file(s) in the index.
 
     The *file_path* argument is treated as a glob/wildcard pattern, so it can
     match one file, many files, or none (which raises ``FileNotFoundError``).
     """
-    matched = glob.glob(str(file_path))
+    matched = glob.glob(file_path)
     # If nothing matched, try treating the path as a literal file (e.g., names
     # containing glob special characters like [ ] ?)
     if not matched:
@@ -40,12 +40,11 @@ def add_file(index_dir: Path, file_path: str | Path, tag: str = None) -> int:
                     content = excluded.content,
                     size = excluded.size,
                     hash = excluded.hash,
-                    tag = excluded.tag,
                     updated_at = datetime('now')
             """,
-                (str(fp.absolute()), content, len(content), file_hash, tag),
+                (str(fp.absolute()), content, len(content), file_hash, ),
             )
-            conn.commit()
             count += 1
+        conn.commit()
 
     return count

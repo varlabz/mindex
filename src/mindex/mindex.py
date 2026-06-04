@@ -387,11 +387,15 @@ def main(argv: list[str] | None = None) -> None:
     # Expand ~ in index_dir to home directory
     index_dir = args.index_dir.expanduser()
     if not index_dir.exists():
-        raise ValueError(f"Index directory does not exist: {index_dir}")
+        raise FileNotFoundError(f"Index directory does not exist: {index_dir}")
 
     if args.command == "add":
-        add_file(index_dir, args.file.expanduser(), tag=args.tag)
-        print(f"Indexed: {args.file}")
+        file = args.file.expanduser()
+        if not file.exists():
+            raise FileNotFoundError(f"File does not exist: {file}")
+
+        add_file(index_dir, file, tag=args.tag)
+        print(f"Indexed: {file}")
 
     elif args.command == "rm":
         del_file(index_dir, args.file.expanduser())

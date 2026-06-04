@@ -765,7 +765,7 @@ class TestCLIOptionsNegative:
 
     def test_invalid_index_dir_type(self, capfd: pytest.CaptureFixture[str]):
         """Test that --index-dir with a non-existent path causes an error."""
-        with pytest.raises(ValueError):
+        with pytest.raises(FileNotFoundError):
             main(["--index-dir", "12345", "add", "something"])
 
     def test_unknown_subcommand(self, capfd: pytest.CaptureFixture[str]):

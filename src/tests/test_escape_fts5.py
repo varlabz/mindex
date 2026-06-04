@@ -1,6 +1,5 @@
 """Tests for _escape_fts5 helper function."""
 
-import pytest
 
 from mindex.mindex import _escape_fts5
 

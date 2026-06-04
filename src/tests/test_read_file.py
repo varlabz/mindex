@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from mindex.mindex import _db, add_file, read_file
+from mindex.mindex import add_file, read_file
 
 
 @pytest.fixture

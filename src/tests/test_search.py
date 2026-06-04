@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from mindex.mindex import _db, add_file, del_file, search
+from mindex.mindex import add_file, del_file, search
 
 
 @pytest.fixture
@@ -18,7 +18,8 @@ def indexed_files(index_dir: Path) -> dict[str, Path]:
     for name, content in [
         ("file1.md", "# Python Tutorial\n\nPython is a great programming language."),
         ("file2.md", "# JavaScript Guide\n\nJavaScript is widely used for web development."),
-        ("file3.md", "# Rust Programming\n\nRust is a systems programming language focused on safety."),
+        ("file3.md",
+         "# Rust Programming\n\nRust is a systems programming language focused on safety."),
     ]:
         file_path = index_dir / name
         file_path.write_text(content, encoding="utf-8")
@@ -81,7 +82,9 @@ class TestSearchPositive:
 
         assert len(results) <= 1
 
-    def test_search_returns_snippet_with_context(self, indexed_files: dict[str, Path], index_dir: Path):
+    def test_search_returns_snippet_with_context(
+        self, indexed_files: dict[str, Path], index_dir: Path
+    ):
         """Test that snippets include surrounding context."""
         results = search(index_dir, "Python")
 

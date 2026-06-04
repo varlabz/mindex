@@ -92,7 +92,7 @@ class TestInfoNegative:
             info(index_dir, file_path)
 
     def test_info_file_exists_but_not_indexed(self, index_dir: Path):
-        """Test that info raises FileNotFoundError for files that exist on disk but are not indexed."""
+        """Test info raises FileNotFoundError for unindexed files."""
         file_path = index_dir / "not_indexed.md"
         file_path.write_text("I exist but am not indexed.", encoding="utf-8")
         with pytest.raises(FileNotFoundError, match="File not indexed"):
@@ -123,13 +123,17 @@ class TestInfoEdgeCases:
 class TestInfoByTagPositive:
     """Positive test cases for info_by_tag."""
 
-    def test_info_by_tag_returns_matching_records(self, index_dir: Path, indexed_file_with_tag: Path):
+    def test_info_by_tag_returns_matching_records(
+        self, index_dir: Path, indexed_file_with_tag: Path
+    ):
         """Test that info_by_tag returns records with the specified tag."""
         results = info_by_tag(index_dir, "article")
         assert len(results) == 1
         assert results[0].tag == "article"
 
-    def test_info_by_tag_returns_multiple_records(self, index_dir: Path, indexed_file_with_tag: Path):
+    def test_info_by_tag_returns_multiple_records(
+        self, index_dir: Path, indexed_file_with_tag: Path
+    ):
         """Test that info_by_tag returns all records with the same tag."""
         for i in range(3):
             file_path = index_dir / f"tagged_{i}.md"

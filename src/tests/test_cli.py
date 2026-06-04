@@ -74,7 +74,7 @@ class TestCLIAddPositive:
         """Test that add command with --tag option stores the tag."""
         _run(["add", str(test_file), "--tag", "wiki"], index_dir, capfd)
 
-        with open(index_dir / DB_FILE) as f:
+        with open(index_dir / DB_FILE):
             pass  # DB created; tag verified via API if needed
 
     def test_add_file_with_short_tag_option(
@@ -177,11 +177,11 @@ class TestCLISearchPositive:
     ):
         """Test that search command with --format text outputs tab-separated lines."""
         out = _run(["search", "programming", "--format", "text"], index_dir, capfd)
-        lines = [l for l in out.strip().split("\n") if l]
+        lines = [line for line in out.strip().split("\n") if line]
         assert len(lines) >= 2
         # Check that the query term appears somewhere in the text output
         # (FTS5 snippet() can contain newlines, so a result may span multiple lines)
-        assert any("programming" in l.lower() for l in lines)
+        assert any("programming" in line.lower() for line in lines)
 
     def test_search_with_tag_filter(self, index_dir: Path, capfd: pytest.CaptureFixture[str]):
         """Test that search command with --tag option filters results."""
@@ -262,9 +262,9 @@ class TestCLIFilePositive:
         main(["--index-dir", str(index_dir), "add", str(test_file)])
 
         out = _run(["file", str(test_file), "hello", "--format", "text"], index_dir, capfd)
-        lines = [l for l in out.strip().split("\n") if l]
+        lines = [line for line in out.strip().split("\n") if line]
         assert len(lines) >= 1
-        assert any("hello" in l for l in lines)
+        assert any("hello" in line for line in lines)
 
     def test_file_search_with_limit(self, index_dir: Path, capfd: pytest.CaptureFixture[str]):
         """Test that file command respects --limit option."""
@@ -528,7 +528,7 @@ class TestCLIEdgeCases:
 
     def test_index_dir_does_not_exist(self):
         """Test that CLI raises error for non-existent index directory."""
-        with pytest.raises(ValueError, match="does not exist"):
+        with pytest.raises(FileNotFoundError, match="does not exist"):
             main(["--index-dir", "/nonexistent/path/xyz", "search", "test"])
 
     def test_add_file_with_tilde_path(self, index_dir: Path, capfd: pytest.CaptureFixture[str]):
@@ -651,7 +651,7 @@ class TestCLISearchNegative:
             _run(["search", "programming", "--format", "xml"], index_dir, capfd)
 
 
-class TestCLIFilePositive:
+class TestCLIFilePositive_2:
     """Positive tests for CLI 'file' command."""
 
     def test_file_search_json_output(
@@ -673,7 +673,7 @@ class TestCLIFilePositive:
         out = _run(
             ["file", str(index_dir / "file1.md"), "Python", "--format", "text"], index_dir, capfd
         )
-        lines = [l for l in out.strip().split("\n") if l]
+        lines = [line for line in out.strip().split("\n") if line]
         assert len(lines) >= 1
 
     def test_file_search_with_limit(
@@ -707,7 +707,7 @@ class TestCLIFilePositive:
         assert len(results) >= 0
 
 
-class TestCLIFileNegative:
+class TestCLIFileNegative_2:
     """Negative tests for CLI 'file' command."""
 
     def test_file_missing_file_argument(self, index_dir: Path, capfd: pytest.CaptureFixture[str]):
@@ -777,7 +777,7 @@ class TestCLIOptionsNegative:
 # ── CLI Edge Cases ──────────────────────────────────────────────────────────────
 
 
-class TestCLIEdgeCases:
+class TestCLIEdgeCases_2:
     """Edge case tests for CLI commands."""
 
     def test_add_file_with_spaces_in_name(self, index_dir: Path, capfd: pytest.CaptureFixture[str]):
@@ -841,7 +841,7 @@ class TestCLIEdgeCases:
     ):
         """Test that search text output has path, tag, snippet separated by tabs."""
         out = _run(["search", "Python", "--format", "text"], index_dir, capfd)
-        lines = [l for l in out.strip().split("\n") if l]
+        lines = [line for line in out.strip().split("\n") if line]
         assert len(lines) >= 1
         # First line should contain the path
         assert "file1.md" in lines[0]
@@ -864,7 +864,7 @@ class TestCLIEdgeCases:
         out = _run(
             ["file", str(index_dir / "file1.md"), "Python", "--format", "text"], index_dir, capfd
         )
-        lines = [l for l in out.strip().split("\n") if l]
+        lines = [line for line in out.strip().split("\n") if line]
         assert len(lines) >= 1
 
     def test_cli_add_search_roundtrip(self, index_dir: Path, capfd: pytest.CaptureFixture[str]):

@@ -3,6 +3,7 @@
 from dataclasses import dataclass
 from pathlib import Path
 
+
 from mindex.db import _db
 
 

@@ -1,7 +1,7 @@
 """Tests for _escape_fts5 helper function."""
 
 
-from mindex.mindex import _escape_fts5
+from mindex.cmd_search import _escape_fts5
 
 
 class TestEscapeFts5Positive:

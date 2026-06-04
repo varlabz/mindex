@@ -5,7 +5,8 @@ from pathlib import Path
 
 import pytest
 
-from mindex.mindex import DB_FILE, main
+from mindex.db import DB_FILE
+from mindex.mindex import main
 
 # ── Fixtures ────────────────────────────────────────────────────────────────────
 

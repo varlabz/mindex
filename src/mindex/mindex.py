@@ -1,16 +1,15 @@
 import argparse
 import json
-from dataclasses import asdict, dataclass
+from dataclasses import asdict
 from pathlib import Path
 
 from mindex.cmd_add_file import add_file
 from mindex.cmd_del_file import del_file
-from mindex.cmd_info import FileInfo, info, info_by_tag
-from mindex.cmd_lint import LintInfo, lint, lint_output
+from mindex.cmd_info import info, info_by_tag
+from mindex.cmd_lint import lint, lint_output
 from mindex.cmd_read_file import read_file
-from mindex.cmd_search import _escape_fts5, search
-from mindex.cmd_search_file import FileSearchResult, search_file
-from mindex.db import DB_FILE, SCHEMA, _db
+from mindex.cmd_search import search
+from mindex.cmd_search_file import search_file
 
 
 # ── CLI ────────────────────────────────────────────────────────────────

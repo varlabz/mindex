@@ -331,8 +331,19 @@ def main(argv: list[str] | None = None) -> None:
 
     # info
     p_info = sub.add_parser("info", help="Show info about an indexed file or list files by tag")
-    p_info.add_argument("file", type=Path, nargs="?", default=None, help="Path to the indexed file (omit when using --tag)")
-    p_info.add_argument("-t", "--tag", default=None, help="Show all records with this tag (file argument is not required)")
+    p_info.add_argument(
+        "file",
+        type=Path,
+        nargs="?",
+        default=None,
+        help="Path to the indexed file (omit when using --tag)",
+    )
+    p_info.add_argument(
+        "-t",
+        "--tag",
+        default=None,
+        help="Show all records with this tag (file argument is not required)",
+    )
     p_info.add_argument(
         "-f",
         "--format",
@@ -344,8 +355,16 @@ def main(argv: list[str] | None = None) -> None:
     # read
     p_read = sub.add_parser("read", help="Read file content from the index")
     p_read.add_argument("file", type=Path, help="Path to the indexed file to read")
-    p_read.add_argument("-p", "--position", type=int, default=0, help="Starting character offset (default: 0)")
-    p_read.add_argument("-s", "--size", type=int, default=4000, help="Number of characters to read (default: 4000 chars)")
+    p_read.add_argument(
+        "-p", "--position", type=int, default=0, help="Starting character offset (default: 0)"
+    )
+    p_read.add_argument(
+        "-s",
+        "--size",
+        type=int,
+        default=4000,
+        help="Number of characters to read (default: 4000 chars)",
+    )
 
     # file
     p_sf = sub.add_parser("file", help="Search within a specific indexed file")
@@ -382,7 +401,7 @@ def main(argv: list[str] | None = None) -> None:
     elif args.command == "info":
         if args.tag and args.file:
             raise ValueError("Error: cannot use both 'file' and '--tag' at the same time")
-        
+
         if args.tag:
             results = info_by_tag(index_dir, args.tag)
             if not results:
@@ -392,10 +411,9 @@ def main(argv: list[str] | None = None) -> None:
                 print(json.dumps([asdict(r) for r in results], indent=2))
             else:
                 for r in results:
-                    print(f"Path:        {r.path}")
-                    print(f"Size:        {r.size}")
-                    print(f"Updated at:  {r.updated_at}")
-                    print(f"Tag:         {r.tag or '-'}")
+                    print("-" * 20)
+                    for k, v in asdict(r).items():
+                        print(f"{k}: {v or '-'}")
                     print()
         else:
             if args.file is None:
@@ -405,10 +423,8 @@ def main(argv: list[str] | None = None) -> None:
             if args.format == "json":
                 print(json.dumps(asdict(fi), indent=2))
             else:
-                print(f"Path:        {fi.path}")
-                print(f"Size:        {fi.size}")
-                print(f"Updated at:  {fi.updated_at}")
-                print(f"Tag:         {fi.tag or '-'}")
+                for k, v in asdict(fi).items():
+                    print(f"{k}: {v or '-'}")
 
     elif args.command == "search":
         results = search(index_dir, args.query, tag=args.tag, limit=args.limit)

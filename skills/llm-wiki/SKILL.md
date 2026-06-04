@@ -32,14 +32,14 @@ uvx --from git+https://github.com/varlabz/mindex mindex-cli --index-dir <index_d
 
 ## Ingest File
 
-- Add a file in the searchable index.
-- The file name for the summary is the same as the original file with replaced directory dividers on '-' (e.g., `raw/sqlite.md` → `summary/raw-sqlite.md`).
-- A Summary file must be stored in the `summary/` in <index_dir> directory.
+Add a file in the searchable index.
+The file name for the summary is the same as the original file with replaced directory dividers on '-' (e.g., `raw/sqlite.md` → `summary/raw-sqlite.md`).
+A Summary file must be stored in the `summary/` in <index_dir> directory.
   - must contain a title, summary, reference to the original file, and relevant tags.
   - summary should be concise and informative, highlighting key points from the original file.
   - reference to the original file (e.g., `[Original](raw/sqlite.md)`).
   - tags in summary file (e.g., `#database #sqlite`).
-- Update index file.
+Update index file.
 
 ```bash
 mindex-cli --index-dir <index_dir> add <file.md>
@@ -50,16 +50,16 @@ mindex-cli --index-dir <index_dir> add <summary_file.md>
 
 ```bash
 # simple case
-mindex-cli --index-dir <index_dir> add raw/sqlite.md -t raw
-mindex-cli --index-dir <index_dir> add summary/raw-sqlite.md -t summary
+mindex-cli --index-dir <index_dir> add raw/sqlite.md
+mindex-cli --index-dir <index_dir> add summary/raw-sqlite.md
 
 # with long path
-mindex-cli --index-dir <index_dir> add raw/notes/sqlite.md -t raw
-mindex-cli --index-dir <index_dir> add summary/raw-notes-sqlite.md -t summary
+mindex-cli --index-dir <index_dir> add raw/notes/sqlite.md
+mindex-cli --index-dir <index_dir> add summary/raw-notes-sqlite.md
 
 # with absolute path
-mindex-cli --index-dir <index_dir> add /home/user/wiki/raw/sqlite.md -t raw
-mindex-cli --index-dir <index_dir> add summary/home-user-wiki-summary-sqlite.md -t summary
+mindex-cli --index-dir <index_dir> add /home/user/wiki/raw/sqlite.md
+mindex-cli --index-dir <index_dir> add summary/home-user-wiki-summary-sqlite.md
 ```
 ---
 
@@ -67,11 +67,13 @@ mindex-cli --index-dir <index_dir> add summary/home-user-wiki-summary-sqlite.md 
 
 Full-text search across all indexed markdown files using FTS5.
 Use FTS5 query syntax for advanced search capabilities (e.g., exact phrases with quotes, boolean operators).
-- Search in summaries (tag `summary`) for more concise results, then expand to raw files if needed.
-- Search in raw files (tag `raw`) for more detailed information if summaries don't provide enough context.
-- Search in file with `mindex-cli file` command for more focused search within a specific file.
-- Read specific files with `mindex-cli read` command to get full content when you find relevant summaries or search results.
-- Change search request if don't get relevant results — try different keywords, use quotes for exact phrases.
+**Minimum query length: 3 characters.** Shorter queries will be rejected.
+Search in index file.
+Search in summaries for more concise results, then expand to raw files if needed.
+Search in raw files for more detailed information if summaries don't provide enough context.
+Search in file with `mindex-cli file` command for more focused search within a specific file.
+Read specific files with `mindex-cli read` command to get full content when you find relevant summaries or search results.
+Change search request if don't get relevant results — try different keywords, use quotes for exact phrases.
 
 ```bash
 mindex-cli --index-dir <index_dir> search "<query>" [options]
@@ -81,7 +83,6 @@ mindex-cli --index-dir <index_dir> search "<query>" [options]
 
 | Flag | Short | Default | Description |
 |------|-------|---------|-------------|
-| `--tag` | `-t` | — | Filter by a tag |
 | `--limit` | `-n` | 10 | Maximum number of results |
 | `--format` | `-f` | `json` | Output format: `json` or `text` |
 | `--index-dir` | — | current dir | Index directory |
@@ -96,10 +97,10 @@ mindex-cli --index-dir <index_dir> search "sqlite fts5"
 mindex-cli --index-dir <index_dir> search "agent memory" --limit 20
 
 # Search with tag `summary` for search in summaries
-mindex-cli --index-dir <index_dir> search "memory" --tag summary
+mindex-cli --index-dir <index_dir> search "memory"
 
 # Search with tag `raw` for search in original files
-mindex-cli --index-dir <index_dir> search "memory" --tag raw
+mindex-cli --index-dir <index_dir> search "memory"
 
 # Plain text output
 mindex-cli --index-dir <index_dir> search "transformer architecture" --format text
@@ -172,7 +173,8 @@ mindex-cli --index-dir <index_dir> read notes/sqlite.md --position 1000 --size 2
 ## Info
 
 Show metadata about indexed files — path, size, last updated timestamp, and tag.
-Useful for checking whether a file is indexed, listing files by tag, or reviewing file properties without reading the full content.
+Useful for checking whether a file is indexed, listing files by tag, listing files matching a glob pattern, or reviewing file properties without reading the full content.
+The `file` argument supports glob patterns (e.g., `*.md`) to filter by path.
 
 ```bash
 mindex-cli --index-dir <index_dir> info [file.md] [options]
@@ -195,10 +197,13 @@ mindex-cli --index-dir <index_dir> info raw/sqlite.md
 mindex-cli --index-dir <index_dir> info raw/sqlite.md --format text
 
 # List all files with a specific tag
-mindex-cli --index-dir <index_dir> info --tag raw
+mindex-cli --index-dir <index_dir> info
 
 # List all files with a specific tag (text output)
-mindex-cli --index-dir <index_dir> info --tag summary --format text
+mindex-cli --index-dir <index_dir> info --format text
+
+# List info for files matching a glob pattern
+mindex-cli --index-dir <index_dir> info 'raw/*.md'
 
 # List all indexed files (no file argument)
 mindex-cli --index-dir <index_dir> info
@@ -232,7 +237,8 @@ mindex-cli --index-dir <index_dir> lint <directory> --fix
 
 ## Remove File from Index (dangerous)
 
-Remove a file from the index (does not delete the actual file).
+Remove one or more files from the index (does not delete the actual file).
+Supports glob patterns (e.g., `*.md`) to batch-remove multiple files at once.
 
 ```bash
 mindex-cli --index-dir <index_dir> rm <file.md>
@@ -247,8 +253,11 @@ mindex-cli --index-dir <index_dir> rm <file.md>
 ### Examples
 
 ```bash
-# Remove file from index
+# Remove single file from index
 mindex-cli --index-dir <index_dir> rm notes/old-notes.md
+
+# Batch-remove all summary files
+mindex-cli --index-dir <index_dir> rm 'summary/*.md'
 ```
 
 ---
@@ -258,6 +267,5 @@ mindex-cli --index-dir <index_dir> rm notes/old-notes.md
 | Scenario | Recommendation |
 |----------|---------------|
 | **Multiple indexes** | Use `--index-dir` to maintain separate wikis (e.g., one per project) |
-| **Search strategy** | Start with `--tag summary` for concise results, then expand to `--tag raw` or use `file` for deeper context |
 | **Focused search** | Use `mindex-cli file` when you know which file contains the answer — faster and more precise than searching the whole index |
 | **Large files** | Use `read` with `--position` and `--size` to read large files in chunks instead of loading the entire content |

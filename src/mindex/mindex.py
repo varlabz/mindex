@@ -6,7 +6,6 @@ import sqlite3
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
-
 DB_FILE = "mindex.sqlite"  # index file stored in vault directory
 
 
@@ -287,6 +286,42 @@ def read_file(index_dir: Path, file_path: Path, start: int, size: int) -> str:
         return content[start:end]
 
 
+@dataclass
+class LintInfo:
+    path: str
+    status: str
+
+
+def lint(index_dir: Path, file_dir: Path | None = None) -> list[LintInfo]:
+    """Lint indexed files: check if they exist on disk.
+
+    Args:
+        index_dir: Path to the index directory.
+        file_dir: Optional directory to filter files by. Only files whose path
+            starts with this directory are returned.
+
+    Returns:
+        List of LintInfo records with 'path' and 'status'.
+    """
+    prefix = str((file_dir / "").absolute()) if file_dir is not None else None
+    with _db(index_dir) as conn:
+        if prefix:
+            rows = conn.execute(
+                "SELECT path FROM docs WHERE SUBSTR(path, 1, LENGTH(?)) = ?",
+                (prefix, prefix),
+            ).fetchall()
+        else:
+            rows = conn.execute("SELECT path FROM docs").fetchall()
+
+    results = []
+    for row in rows:
+        file_path = Path(row["path"])
+        status = "OK" if file_path.is_file() else "missing"
+        results.append(LintInfo(path=str(file_path), status=status))
+
+    return results
+
+
 # ── CLI ────────────────────────────────────────────────────────────────
 
 
@@ -362,6 +397,25 @@ def main(argv: list[str] | None = None) -> None:
         type=int,
         default=4000,
         help="Number of characters to read (default: 4000 chars)",
+    )
+
+    # lint
+    p_lint = sub.add_parser(
+        "lint", help="Lint indexed files: check existence and directory membership"
+    )
+    p_lint.add_argument(
+        "file_dir",
+        type=Path,
+        nargs="?",
+        default=None,
+        help="Optional directory to verify files belong to",
+    )
+    p_lint.add_argument(
+        "-f",
+        "--format",
+        choices=["json", "text"],
+        default="json",
+        help="Output format (default: json)",
     )
 
     # file
@@ -449,6 +503,21 @@ def main(argv: list[str] | None = None) -> None:
     elif args.command == "read":
         content = read_file(index_dir, args.file.expanduser(), start=args.position, size=args.size)
         print(content)
+
+    elif args.command == "lint":
+        file_dir = args.file_dir.expanduser() if args.file_dir else None
+        results = lint(index_dir, file_dir)
+        if not results:
+            print("No indexed files.")
+            return
+        if args.format == "json":
+            print(json.dumps([asdict(r) for r in results], indent=2))
+        else:
+            for r in results:
+                print("-" * 20)
+                for k, v in asdict(r).items():
+                    print(f"{k}: {v or '-'}")
+                print()
 
 
 if __name__ == "__main__":

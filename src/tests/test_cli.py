@@ -732,6 +732,165 @@ class TestCLIFileNegative_2:
 # ── CLI Global Options Tests ────────────────────────────────────────────────────
 
 
+class TestCLILintPositive:
+    """Positive tests for CLI 'lint' command."""
+
+    def test_lint_empty_index(self, index_dir: Path, capfd: pytest.CaptureFixture[str]):
+        """Test that lint prints 'No indexed files.' when index is empty."""
+        out = _run(["lint"], index_dir, capfd)
+        assert "No indexed files." in out
+
+    def test_lint_json_output(self, index_dir: Path, capfd: pytest.CaptureFixture[str]):
+        """Test that lint command outputs valid JSON."""
+        test_file = index_dir / "test.md"
+        test_file.write_text("# Hello\n\nContent.", encoding="utf-8")
+        main(["--index-dir", str(index_dir), "add", str(test_file)])
+
+        out = _run(["lint"], index_dir, capfd)
+        results = json.loads(out)
+        assert isinstance(results, list)
+        assert len(results) == 1
+        assert results[0]["path"] == str(test_file.absolute())
+        assert results[0]["status"] == "OK"
+
+    def test_lint_text_output(self, index_dir: Path, capfd: pytest.CaptureFixture[str]):
+        """Test that lint command with --format text outputs labeled fields."""
+        test_file = index_dir / "test.md"
+        test_file.write_text("# Hello\n\nContent.", encoding="utf-8")
+        main(["--index-dir", str(index_dir), "add", str(test_file)])
+
+        out = _run(["lint", "--format", "text"], index_dir, capfd)
+        assert "path:" in out
+        assert "status:" in out
+        assert "OK" in out
+
+    def test_lint_with_file_dir(self, index_dir: Path, capfd: pytest.CaptureFixture[str]):
+        """Test that lint with file_dir filters results."""
+        vault = index_dir / "vault"
+        vault.mkdir()
+        test_file = vault / "test.md"
+        test_file.write_text("# Vault File\n\nContent.", encoding="utf-8")
+        main(["--index-dir", str(index_dir), "add", str(test_file)])
+
+        out = _run(["lint", str(vault)], index_dir, capfd)
+        results = json.loads(out)
+        assert len(results) == 1
+        assert results[0]["status"] == "OK"
+
+    def test_lint_missing_file(self, index_dir: Path, capfd: pytest.CaptureFixture[str]):
+        """Test that lint reports 'missing' status for deleted files."""
+        test_file = index_dir / "to_delete.md"
+        test_file.write_text("Will be deleted.", encoding="utf-8")
+        main(["--index-dir", str(index_dir), "add", str(test_file)])
+        test_file.unlink()
+
+        out = _run(["lint"], index_dir, capfd)
+        results = json.loads(out)
+        assert len(results) == 1
+        assert results[0]["status"] == "missing"
+
+    def test_lint_multiple_files(self, index_dir: Path, capfd: pytest.CaptureFixture[str]):
+        """Test that lint reports status for multiple indexed files."""
+        for i in range(5):
+            f = index_dir / f"file_{i}.md"
+            f.write_text(f"Content {i}", encoding="utf-8")
+            main(["--index-dir", str(index_dir), "add", str(f)])
+
+        out = _run(["lint"], index_dir, capfd)
+        results = json.loads(out)
+        assert len(results) == 5
+        assert all(r["status"] == "OK" for r in results)
+
+
+class TestCLILintNegative:
+    """Negative tests for CLI 'lint' command."""
+
+    def test_lint_nonexistent_file_dir(self, index_dir: Path, capfd: pytest.CaptureFixture[str]):
+        """Test that lint with non-existent file_dir prints 'No indexed files.'."""
+        out = _run(["lint", "/nonexistent/path/xyz"], index_dir, capfd)
+        assert "No indexed files." in out
+
+    def test_lint_invalid_format(self, index_dir: Path, capfd: pytest.CaptureFixture[str]):
+        """Test that lint with invalid format raises an error."""
+        with pytest.raises(SystemExit):
+            _run(["lint", "--format", "xml"], index_dir, capfd)
+
+
+class TestCLILintEdgeCases:
+    """Edge case tests for CLI 'lint' command."""
+
+    def test_lint_file_dir_with_trailing_slash(
+        self, index_dir: Path, capfd: pytest.CaptureFixture[str]
+    ):
+        """Test that lint works when file_dir path has no trailing slash."""
+        vault = index_dir / "vault"
+        vault.mkdir()
+        test_file = vault / "test.md"
+        test_file.write_text("# Vault File\n\nContent.", encoding="utf-8")
+        main(["--index-dir", str(index_dir), "add", str(test_file)])
+
+        # Use path without trailing slash
+        out = _run(["lint", str(vault)], index_dir, capfd)
+        results = json.loads(out)
+        assert len(results) == 1
+        assert results[0]["status"] == "OK"
+
+    def test_lint_file_dir_subdirectory_only(
+        self, index_dir: Path, capfd: pytest.CaptureFixture[str]
+    ):
+        """Test lint with file_dir set to a subdirectory."""
+        vault = index_dir / "vault"
+        vault.mkdir()
+        sub = vault / "sub"
+        sub.mkdir()
+
+        inside = sub / "inside.md"
+        inside.write_text("Inside sub.", encoding="utf-8")
+        main(["--index-dir", str(index_dir), "add", str(inside)])
+
+        outside = vault / "outside.md"
+        outside.write_text("Outside sub.", encoding="utf-8")
+        main(["--index-dir", str(index_dir), "add", str(outside)])
+
+        out = _run(["lint", str(sub)], index_dir, capfd)
+        results = json.loads(out)
+        assert len(results) == 1
+        assert "inside.md" in results[0]["path"]
+
+    def test_lint_mixed_ok_and_missing(
+        self, index_dir: Path, capfd: pytest.CaptureFixture[str]
+    ):
+        """Test lint with a mix of existing and missing files."""
+        f1 = index_dir / "exists.md"
+        f1.write_text("Exists.", encoding="utf-8")
+        main(["--index-dir", str(index_dir), "add", str(f1)])
+
+        f2 = index_dir / "gone.md"
+        f2.write_text("Gone.", encoding="utf-8")
+        main(["--index-dir", str(index_dir), "add", str(f2)])
+        f2.unlink()
+
+        out = _run(["lint"], index_dir, capfd)
+        results = json.loads(out)
+        assert len(results) == 2
+        statuses = {r["status"] for r in results}
+        assert "OK" in statuses
+        assert "missing" in statuses
+
+    def test_lint_special_chars_in_path(
+        self, index_dir: Path, capfd: pytest.CaptureFixture[str]
+    ):
+        """Test lint with file containing special characters in name."""
+        f = index_dir / "test-file_v2.0 (draft).md"
+        f.write_text("Special name content.", encoding="utf-8")
+        main(["--index-dir", str(index_dir), "add", str(f)])
+
+        out = _run(["lint"], index_dir, capfd)
+        results = json.loads(out)
+        assert len(results) == 1
+        assert results[0]["status"] == "OK"
+
+
 class TestCLIOptionsPositive:
     """Positive tests for global CLI options."""
 

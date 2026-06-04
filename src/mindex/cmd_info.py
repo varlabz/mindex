@@ -14,7 +14,7 @@ class FileInfo:
     tag: str
 
 
-def info(index_dir: Path, file_path: Path) -> FileInfo:
+def info_by_file(index_dir: Path, file_path: Path) -> FileInfo:
     """Return basic info about an indexed file record.
 
     Args:

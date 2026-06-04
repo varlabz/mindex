@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 
 from mindex.cmd_add_file import add_file
-from mindex.cmd_info import FileInfo, info, info_by_tag
+from mindex.cmd_info import FileInfo, info_by_file, info_by_tag
 
 
 @pytest.fixture
@@ -37,7 +37,7 @@ class TestInfoPositive:
 
     def test_info_returns_file_info(self, index_dir: Path, indexed_file: Path):
         """Test that info returns a FileInfo object with correct fields."""
-        fi = info(index_dir, indexed_file)
+        fi = info_by_file(index_dir, indexed_file)
         assert isinstance(fi, FileInfo)
         assert fi.path == str(indexed_file.absolute())
         assert fi.size > 0
@@ -47,22 +47,22 @@ class TestInfoPositive:
     def test_info_returns_size_correctly(self, index_dir: Path, indexed_file: Path):
         """Test that info returns the correct file size."""
         content = indexed_file.read_text(encoding="utf-8")
-        fi = info(index_dir, indexed_file)
+        fi = info_by_file(index_dir, indexed_file)
         assert fi.size == len(content)
 
     def test_info_returns_none_tag_when_not_set(self, index_dir: Path, indexed_file: Path):
         """Test that info returns None for tag when no tag was set."""
-        fi = info(index_dir, indexed_file)
+        fi = info_by_file(index_dir, indexed_file)
         assert fi.tag is None
 
     def test_info_returns_tag_when_set(self, index_dir: Path, indexed_file_with_tag: Path):
         """Test that info returns the correct tag."""
-        fi = info(index_dir, indexed_file_with_tag)
+        fi = info_by_file(index_dir, indexed_file_with_tag)
         assert fi.tag == "article"
 
     def test_info_returns_absolute_path(self, index_dir: Path, indexed_file: Path):
         """Test that info returns the absolute path."""
-        fi = info(index_dir, indexed_file)
+        fi = info_by_file(index_dir, indexed_file)
         assert fi.path.startswith("/")
 
     def test_info_empty_file(self, index_dir: Path):
@@ -70,7 +70,7 @@ class TestInfoPositive:
         file_path = index_dir / "empty.md"
         file_path.write_text("", encoding="utf-8")
         add_file(index_dir, file_path)
-        fi = info(index_dir, file_path)
+        fi = info_by_file(index_dir, file_path)
         assert fi.size == 0
 
     def test_info_large_file(self, index_dir: Path):
@@ -79,7 +79,7 @@ class TestInfoPositive:
         content = "x" * 100_000
         file_path.write_text(content, encoding="utf-8")
         add_file(index_dir, file_path)
-        fi = info(index_dir, file_path)
+        fi = info_by_file(index_dir, file_path)
         assert fi.size == 100_000
 
 
@@ -90,14 +90,14 @@ class TestInfoNegative:
         """Test that info raises FileNotFoundError for non-indexed files."""
         file_path = index_dir / "nonexistent.md"
         with pytest.raises(FileNotFoundError, match="File not indexed"):
-            info(index_dir, file_path)
+            info_by_file(index_dir, file_path)
 
     def test_info_file_exists_but_not_indexed(self, index_dir: Path):
         """Test info raises FileNotFoundError for unindexed files."""
         file_path = index_dir / "not_indexed.md"
         file_path.write_text("I exist but am not indexed.", encoding="utf-8")
         with pytest.raises(FileNotFoundError, match="File not indexed"):
-            info(index_dir, file_path)
+            info_by_file(index_dir, file_path)
 
 
 class TestInfoEdgeCases:
@@ -108,7 +108,7 @@ class TestInfoEdgeCases:
         file_path = index_dir / "test-file_v2.0 (draft).md"
         file_path.write_text("Special name content.", encoding="utf-8")
         add_file(index_dir, file_path)
-        fi = info(index_dir, file_path)
+        fi = info_by_file(index_dir, file_path)
         assert fi.size == len("Special name content.")
 
     def test_info_file_with_unicode_content(self, index_dir: Path):
@@ -117,7 +117,7 @@ class TestInfoEdgeCases:
         content = "こんにちは世界 🌍"
         file_path.write_text(content, encoding="utf-8")
         add_file(index_dir, file_path)
-        fi = info(index_dir, file_path)
+        fi = info_by_file(index_dir, file_path)
         assert fi.size == len(content)
 
 
@@ -201,11 +201,11 @@ class TestInfoByTagEdgeCases:
         file_path = index_dir / "update.md"
         file_path.write_text("Short.", encoding="utf-8")
         add_file(index_dir, file_path)
-        fi1 = info(index_dir, file_path)
+        fi1 = info_by_file(index_dir, file_path)
 
         file_path.write_text("This is much longer content now.", encoding="utf-8")
         add_file(index_dir, file_path)
-        fi2 = info(index_dir, file_path)
+        fi2 = info_by_file(index_dir, file_path)
 
         assert fi2.size > fi1.size
         assert fi2.size == len("This is much longer content now.")

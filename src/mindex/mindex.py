@@ -10,6 +10,7 @@ from mindex.cmd_lint import lint, lint_fix, lint_output
 from mindex.cmd_read_file import read_file
 from mindex.cmd_search import search
 from mindex.cmd_search_file import search_file
+from mindex.db import DB_FILE
 
 # ── CLI ────────────────────────────────────────────────────────────────
 
@@ -24,23 +25,23 @@ def main(argv: list[str] | None = None) -> None:
         "--index-dir",
         type=Path,
         default=Path("."),
-        help="Index directory containing mindex.sqlite (default: current directory)",
+        help=f"Directory containing the {DB_FILE} database (default: current directory)",
     )
 
     sub = parser.add_subparsers(dest="command", help="Available commands")
 
     # add
     p_add = sub.add_parser("add", help="Add or update a file in the index")
-    p_add.add_argument("file", type=str, help="Path to the file to index. Can use wildcard (e.g. \"~/*.md\")")
-    p_add.add_argument("-t", "--tag", default=None, help="Optional tag for the file")
+    p_add.add_argument("file", type=str, help="File path or glob pattern to index (e.g., \"~/*.md\")")
+    p_add.add_argument("-t", "--tag", default=None, help="Tag to categorize the indexed file (e.g., raw, summary)")
 
     # rm
     p_del = sub.add_parser("rm", help="Remove a file from the index")
-    p_del.add_argument("file", type=str, help="Path to the file to remove (e.g. \"~/name*/*.md\")")
+    p_del.add_argument("file", type=str, help="File path or glob pattern to remove from the index (e.g., \"~/*.md\")")
 
     # search
     p_search = sub.add_parser("search", help="Search indexed files via FTS5")
-    p_search.add_argument("query", help="Search query (min 3 chars)")
+    p_search.add_argument("query", help="Full-text search query (minimum 3 characters)")
     p_search.add_argument("-t", "--tag", default=None, help="Filter by tag")
     p_search.add_argument("-n", "--limit", type=int, default=10, help="Max results")
     p_search.add_argument(
@@ -58,7 +59,7 @@ def main(argv: list[str] | None = None) -> None:
         type=str,
         nargs="?",
         default=None,
-        help='Filename patter to the indexed file (e.g. "~/name*/*.md")',
+        help='File path or glob pattern to filter indexed files (e.g., "~/*.md")',
     )
     p_info.add_argument(
         "-t",
@@ -85,7 +86,7 @@ def main(argv: list[str] | None = None) -> None:
         "--size",
         type=int,
         default=4000,
-        help="Number of characters to read (default: 4000 chars)",
+        help="Number of characters to read (default: 4000)",
     )
 
     # lint

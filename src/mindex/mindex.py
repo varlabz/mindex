@@ -36,7 +36,7 @@ def main(argv: list[str] | None = None) -> None:
 
     # rm
     p_del = sub.add_parser("rm", help="Remove a file from the index")
-    p_del.add_argument("file", type=Path, help="Path to the file to remove")
+    p_del.add_argument("file", type=str, help="Path to the file to remove (e.g. \"~/name*/*.md\")")
 
     # search
     p_search = sub.add_parser("search", help="Search indexed files via FTS5")
@@ -139,12 +139,16 @@ def main(argv: list[str] | None = None) -> None:
 
     if args.command == "add":
         file = str(Path(args.file).expanduser().absolute())
-        add_file(index_dir, file, tag=args.tag)
-        print(f"Indexed: {args.file}")
+        count = add_file(index_dir, file, tag=args.tag)
+        print(f"Indexed: {args.file} ({count} record{'s' if count != 1 else ''})")
 
     elif args.command == "rm":
-        del_file(index_dir, args.file.expanduser())
-        print(f"Removed: {args.file}")
+        file = str(Path(args.file).expanduser().absolute())
+        try:
+            count = del_file(index_dir, file)
+            print(f"Removed: {args.file} ({count} record{'s' if count != 1 else ''})")
+        except FileNotFoundError:
+            print(f"Not found: {args.file}")
 
     elif args.command == "info":
         if args.tag and args.file:

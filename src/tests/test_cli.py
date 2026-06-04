@@ -102,7 +102,7 @@ class TestCLIRmPositive:
         # First add, then remove
         main(["--index-dir", str(index_dir), "add", str(test_file)])
         out = _run(["rm", str(test_file)], index_dir, capfd)
-        assert f"Removed: {test_file}" in out
+        assert f"Removed: {test_file} (1 record)" in out
 
     def test_rm_removes_from_index(self, index_dir: Path, test_file: Path):
         """Test that rm command actually removes the file from the index."""

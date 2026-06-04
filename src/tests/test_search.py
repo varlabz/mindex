@@ -226,7 +226,7 @@ class TestSearchEdgeCases:
     def test_search_after_delete(self, indexed_files: dict[str, Path], index_dir: Path):
         """Test that search doesn't return deleted files."""
         file1 = indexed_files["file1.md"]
-        del_file(index_dir, file1)
+        assert del_file(index_dir, file1) == 1
 
         results = search(index_dir, "Python")
 

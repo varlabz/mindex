@@ -139,7 +139,7 @@ class TestReadFileNegative:
         """Test that reading a deleted file raises FileNotFoundError."""
         from mindex.cmd_del_file import del_file
 
-        del_file(index_dir, indexed_file)
+        assert del_file(index_dir, indexed_file) == 1
 
         with pytest.raises(FileNotFoundError, match="not indexed"):
             read_file(index_dir, indexed_file, 0, 10)

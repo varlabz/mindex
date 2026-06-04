@@ -1,27 +1,48 @@
-"""Add file command: index a file into the FTS5 search index."""
+"""Add file command: index files into the FTS5 search index."""
 
+import glob
 import hashlib
 from pathlib import Path
 
 from mindex.db import _db
 
 
-def add_file(index_dir: Path, file_path: Path, tag: str = None) -> None:
-    """Add or update a file in the index."""
-    content = file_path.read_text(encoding="utf-8")
-    hash = hashlib.sha256(content.encode()).hexdigest()
+def add_file(index_dir: Path, file_path: str | Path, tag: str = None) -> None:
+    """Add or update file(s) in the index.
+
+    The *file_path* argument is treated as a glob/wildcard pattern, so it can
+    match one file, many files, or none (which raises ``FileNotFoundError``).
+    """
+    matched = glob.glob(str(file_path))
+
+    # If nothing matched, try treating the path as a literal file (e.g., names
+    # containing glob special characters like [ ] ?)
+    if not matched:
+        literal = Path(file_path)
+        if literal.is_file():
+            matched = [str(literal)]
+
+    if not matched:
+        raise FileNotFoundError(f"No files matched pattern: {file_path}")
+
     with _db(index_dir) as conn:
-        conn.execute(
-            """
-            INSERT INTO docs (path, content, size, hash, tag)
-            VALUES (?, ?, ?, ?, ?)
-            ON CONFLICT(path) DO UPDATE SET
-                content = excluded.content,
-                size = excluded.size,
-                hash = excluded.hash,
-                tag = excluded.tag,
-                updated_at = datetime('now')
-        """,
-            (str(file_path.absolute()), content, len(content), hash, tag),
-        )
+        for fp in map(Path, matched):
+            if not fp.is_file():
+                continue
+
+            content = fp.read_text(encoding="utf-8")
+            file_hash = hashlib.sha256(content.encode()).hexdigest()
+            conn.execute(
+                """
+                INSERT INTO docs (path, content, size, hash, tag)
+                VALUES (?, ?, ?, ?, ?)
+                ON CONFLICT(path) DO UPDATE SET
+                    content = excluded.content,
+                    size = excluded.size,
+                    hash = excluded.hash,
+                    tag = excluded.tag,
+                    updated_at = datetime('now')
+            """,
+                (str(fp.absolute()), content, len(content), file_hash, tag),
+            )
         conn.commit()

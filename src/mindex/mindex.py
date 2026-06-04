@@ -31,7 +31,7 @@ def main(argv: list[str] | None = None) -> None:
 
     # add
     p_add = sub.add_parser("add", help="Add or update a file in the index")
-    p_add.add_argument("file", type=Path, help="Path to the file to index")
+    p_add.add_argument("file", type=str, help="Path to the file to index. Can use wildcard (e.g. \"~/*.md\")")
     p_add.add_argument("-t", "--tag", default=None, help="Optional tag for the file")
 
     # rm
@@ -138,7 +138,8 @@ def main(argv: list[str] | None = None) -> None:
         raise FileNotFoundError(f"Index directory does not exist: {index_dir}")
 
     if args.command == "add":
-        add_file(index_dir, args.file.expanduser(), tag=args.tag)
+        file = str(Path(args.file).expanduser().absolute())
+        add_file(index_dir, file, tag=args.tag)
         print(f"Indexed: {args.file}")
 
     elif args.command == "rm":
@@ -151,10 +152,7 @@ def main(argv: list[str] | None = None) -> None:
 
         if args.tag:
             results = info_by_tag(index_dir, args.tag)
-            if not results:
-                print(f"No records found with tag: {args.tag}")
-                return
-            print_info(results, args.format)
+            print_info(results, args.format, tag=args.tag)
         else:
             file = str(Path(args.file).expanduser().absolute()) if args.file else None
             results = info_by_file(index_dir, file)

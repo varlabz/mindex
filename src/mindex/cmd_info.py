@@ -67,15 +67,18 @@ def info_by_tag(index_dir: Path, tag: str) -> list[FileInfo]:
         return [FileInfo(**row) for row in rows]
 
 
-def print_info(results: list[FileInfo], fmt: str = "json") -> None:
+def print_info(results: list[FileInfo], fmt: str = "json", tag: str = None) -> None:
     """Print a list of FileInfo records in the given format.
 
     Args:
         results: List of FileInfo records to print.
         fmt: Output format — "json" or "text" (default: "json").
+        tag: Optional tag label to include in the empty-result message.
     """
     if not results:
-        if fmt == "json":
+        if tag is not None:
+            print(f"No records found with tag: {tag}")
+        elif fmt == "json":
             print("[]")
         else:
             print("No records found.")

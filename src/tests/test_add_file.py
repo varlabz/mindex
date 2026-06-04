@@ -2,7 +2,8 @@ from pathlib import Path
 
 import pytest
 
-from mindex.mindex import _db, add_file
+from mindex.cmd_add_file import add_file
+from mindex.db import _db
 
 
 @pytest.fixture

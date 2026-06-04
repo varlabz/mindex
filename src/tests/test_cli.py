@@ -105,7 +105,8 @@ class TestCLIRmPositive:
 
     def test_rm_removes_from_index(self, index_dir: Path, test_file: Path):
         """Test that rm command actually removes the file from the index."""
-        from mindex.mindex import _db, add_file
+        from mindex.cmd_add_file import add_file
+        from mindex.db import _db
 
         add_file(index_dir, test_file)
 

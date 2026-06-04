@@ -4,7 +4,9 @@ from pathlib import Path
 
 import pytest
 
-from mindex.mindex import LintInfo, add_file, del_file, lint
+from mindex.cmd_lint import LintInfo, lint
+from mindex.cmd_add_file import add_file
+from mindex.cmd_del_file import del_file
 
 
 @pytest.fixture

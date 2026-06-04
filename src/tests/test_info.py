@@ -4,7 +4,8 @@ from pathlib import Path
 
 import pytest
 
-from mindex.mindex import add_file, FileInfo, info, info_by_tag
+from mindex.cmd_add_file import add_file
+from mindex.cmd_info import FileInfo, info, info_by_tag
 
 
 @pytest.fixture

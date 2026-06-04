@@ -2,7 +2,9 @@ from pathlib import Path
 
 import pytest
 
-from mindex.mindex import add_file, del_file, search
+from mindex.cmd_add_file import add_file
+from mindex.cmd_del_file import del_file
+from mindex.mindex import search
 
 
 @pytest.fixture

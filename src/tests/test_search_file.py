@@ -1,7 +1,8 @@
 import tempfile
 from pathlib import Path
 
-from mindex.mindex import MARK_START, MARK_END, PAD, _extract_snippets, add_file, search_file
+from mindex.cmd_add_file import add_file
+from mindex.cmd_search_file import MARK_START, MARK_END, PAD, _extract_snippets, search_file
 
 
 def test_search_file_single_match():

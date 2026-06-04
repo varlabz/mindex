@@ -4,7 +4,8 @@ from pathlib import Path
 
 import pytest
 
-from mindex.mindex import add_file, read_file
+from mindex.cmd_add_file import add_file
+from mindex.cmd_read_file import read_file
 
 
 @pytest.fixture
@@ -136,7 +137,7 @@ class TestReadFileNegative:
 
     def test_read_deleted_file_raises(self, index_dir: Path, indexed_file: Path):
         """Test that reading a deleted file raises FileNotFoundError."""
-        from mindex.mindex import del_file
+        from mindex.cmd_del_file import del_file
 
         del_file(index_dir, indexed_file)
 

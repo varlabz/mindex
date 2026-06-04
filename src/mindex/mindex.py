@@ -216,6 +216,25 @@ def info(index_dir: Path, file_path: Path) -> FileInfo:
         return FileInfo(**row)
 
 
+def info_by_tag(index_dir: Path, tag: str) -> list[FileInfo]:
+    """Return info for all indexed files with the given tag.
+
+    Args:
+        index_dir: Path to the index directory.
+        tag: Tag to filter by.
+
+    Returns:
+        List of FileInfo records matching the tag.
+    """
+    with _db(index_dir) as conn:
+        rows = conn.execute(
+            "SELECT path, size, updated_at, tag FROM docs WHERE tag = ?",
+            (tag,),
+        ).fetchall()
+
+        return [FileInfo(**row) for row in rows]
+
+
 def read_file(index_dir: Path, file_path: Path, start: int = 0, size: int = None) -> str:
     """Read file content from the index with optional pagination.
 
@@ -311,8 +330,9 @@ def main(argv: list[str] | None = None) -> None:
     )
 
     # info
-    p_info = sub.add_parser("info", help="Show info about an indexed file")
-    p_info.add_argument("file", type=Path, help="Path to the indexed file")
+    p_info = sub.add_parser("info", help="Show info about an indexed file or list files by tag")
+    p_info.add_argument("file", type=Path, nargs="?", default=None, help="Path to the indexed file (omit when using --tag)")
+    p_info.add_argument("-t", "--tag", default=None, help="Show all records with this tag (file argument is not required)")
     p_info.add_argument(
         "-f",
         "--format",
@@ -360,14 +380,35 @@ def main(argv: list[str] | None = None) -> None:
         print(f"Removed: {args.file}")
 
     elif args.command == "info":
-        fi = info(index_dir, args.file.expanduser())
-        if args.format == "json":
-            print(json.dumps(asdict(fi), indent=2))
+        if args.tag and args.file:
+            raise ValueError("Error: cannot use both 'file' and '--tag' at the same time")
+        
+        if args.tag:
+            results = info_by_tag(index_dir, args.tag)
+            if not results:
+                print(f"No records found with tag: {args.tag}")
+                return
+            if args.format == "json":
+                print(json.dumps([asdict(r) for r in results], indent=2))
+            else:
+                for r in results:
+                    print(f"Path:        {r.path}")
+                    print(f"Size:        {r.size}")
+                    print(f"Updated at:  {r.updated_at}")
+                    print(f"Tag:         {r.tag or '-'}")
+                    print()
         else:
-            print(f"Path:        {fi.path}")
-            print(f"Size:        {fi.size}")
-            print(f"Updated at:  {fi.updated_at}")
-            print(f"Tag:         {fi.tag or '-'}")
+            if args.file is None:
+                print("Error: 'file' argument is required when not using --tag")
+                return
+            fi = info(index_dir, args.file.expanduser())
+            if args.format == "json":
+                print(json.dumps(asdict(fi), indent=2))
+            else:
+                print(f"Path:        {fi.path}")
+                print(f"Size:        {fi.size}")
+                print(f"Updated at:  {fi.updated_at}")
+                print(f"Tag:         {fi.tag or '-'}")
 
     elif args.command == "search":
         results = search(index_dir, args.query, tag=args.tag, limit=args.limit)

@@ -483,6 +483,66 @@ class TestCLIInfoPositive:
         out = _run(["info", str(test_file), "--format", "text"], index_dir, capfd)
         assert "Tag:         -" in out
 
+    def test_info_tag_json_output(
+        self, index_dir: Path, capfd: pytest.CaptureFixture[str]
+    ):
+        """Test that info --tag outputs valid JSON with multiple records."""
+        for i in range(3):
+            f = index_dir / f"tagged_{i}.md"
+            f.write_text(f"content {i}", encoding="utf-8")
+            main(["--index-dir", str(index_dir), "add", str(f), "--tag", "wiki"])
+
+        out = _run(["info", "--tag", "wiki"], index_dir, capfd)
+        results = json.loads(out)
+        assert isinstance(results, list)
+        assert len(results) == 3
+        assert all(r["tag"] == "wiki" for r in results)
+
+    def test_info_tag_text_output(
+        self, index_dir: Path, capfd: pytest.CaptureFixture[str]
+    ):
+        """Test that info --tag with --format text outputs labeled fields."""
+        f = index_dir / "tagged.md"
+        f.write_text("content", encoding="utf-8")
+        main(["--index-dir", str(index_dir), "add", str(f), "--tag", "article"])
+
+        out = _run(["info", "--tag", "article", "--format", "text"], index_dir, capfd)
+        assert "Path:" in out
+        assert "Size:" in out
+        assert "Updated at:" in out
+        assert "Tag:         article" in out
+
+    def test_info_tag_no_results(
+        self, index_dir: Path, capfd: pytest.CaptureFixture[str]
+    ):
+        """Test that info --tag prints message when no records match."""
+        out = _run(["info", "--tag", "nonexistent"], index_dir, capfd)
+        assert "No records found with tag: nonexistent" in out
+
+    def test_info_tag_and_file_error(
+        self, index_dir: Path, capfd: pytest.CaptureFixture[str]
+    ):
+        """Test that info with both file and --tag prints error."""
+        test_file = index_dir / "target.md"
+        test_file.write_text("content", encoding="utf-8")
+        main(["--index-dir", str(index_dir), "add", str(test_file)])
+
+        with pytest.raises(ValueError, match="cannot use both 'file' and '--tag'"):
+            _run(["info", str(test_file), "--tag", "wiki"], index_dir, capfd)
+
+    def test_info_tag_with_single_record(
+        self, index_dir: Path, capfd: pytest.CaptureFixture[str]
+    ):
+        """Test that info --tag works with a single matching record."""
+        f = index_dir / "single.md"
+        f.write_text("single content", encoding="utf-8")
+        main(["--index-dir", str(index_dir), "add", str(f), "--tag", "solo"])
+
+        out = _run(["info", "--tag", "solo"], index_dir, capfd)
+        results = json.loads(out)
+        assert len(results) == 1
+        assert results[0]["tag"] == "solo"
+
 
 class TestCLIInfoNegative:
     """Negative tests for CLI 'info' command."""
@@ -500,9 +560,9 @@ class TestCLIInfoNegative:
     def test_info_missing_file_argument(
         self, index_dir: Path, capfd: pytest.CaptureFixture[str]
     ):
-        """Test that info command requires a file argument."""
-        with pytest.raises(SystemExit):
-            _run(["info"], index_dir, capfd)
+        """Test that info command prints error when no file or --tag is provided."""
+        out = _run(["info"], index_dir, capfd)
+        assert "Error: 'file' argument is required when not using --tag" in out
 
 
 class TestCLIEdgeCases:

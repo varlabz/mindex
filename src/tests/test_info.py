@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from mindex.mindex import add_file, FileInfo, info
+from mindex.mindex import add_file, FileInfo, info, info_by_tag
 
 
 @pytest.fixture
@@ -118,6 +118,78 @@ class TestInfoEdgeCases:
         add_file(index_dir, file_path)
         fi = info(index_dir, file_path)
         assert fi.size == len(content)
+
+
+class TestInfoByTagPositive:
+    """Positive test cases for info_by_tag."""
+
+    def test_info_by_tag_returns_matching_records(self, index_dir: Path, indexed_file_with_tag: Path):
+        """Test that info_by_tag returns records with the specified tag."""
+        results = info_by_tag(index_dir, "article")
+        assert len(results) == 1
+        assert results[0].tag == "article"
+
+    def test_info_by_tag_returns_multiple_records(self, index_dir: Path, indexed_file_with_tag: Path):
+        """Test that info_by_tag returns all records with the same tag."""
+        for i in range(3):
+            file_path = index_dir / f"tagged_{i}.md"
+            file_path.write_text(f"Content {i}", encoding="utf-8")
+            add_file(index_dir, file_path, tag="article")
+        results = info_by_tag(index_dir, "article")
+        assert len(results) == 4  # 1 from fixture + 3 added
+
+    def test_info_by_tag_returns_correct_paths(self, index_dir: Path):
+        """Test that info_by_tag returns correct file paths."""
+        file_path = index_dir / "path_test.md"
+        file_path.write_text("Path test content.", encoding="utf-8")
+        add_file(index_dir, file_path, tag="test")
+        results = info_by_tag(index_dir, "test")
+        assert len(results) == 1
+        assert results[0].path == str(file_path.absolute())
+
+    def test_info_by_tag_returns_correct_size(self, index_dir: Path):
+        """Test that info_by_tag returns correct file sizes."""
+        file_path = index_dir / "size_test.md"
+        content = "Size test content."
+        file_path.write_text(content, encoding="utf-8")
+        add_file(index_dir, file_path, tag="test")
+        results = info_by_tag(index_dir, "test")
+        assert len(results) == 1
+        assert results[0].size == len(content)
+
+
+class TestInfoByTagNegative:
+    """Negative test cases for info_by_tag."""
+
+    def test_info_by_tag_no_matching_records(self, index_dir: Path):
+        """Test that info_by_tag returns empty list for non-existent tag."""
+        results = info_by_tag(index_dir, "nonexistent")
+        assert results == []
+
+    def test_info_by_tag_empty_tag(self, index_dir: Path):
+        """Test that info_by_tag returns empty list for empty tag string."""
+        results = info_by_tag(index_dir, "")
+        assert results == []
+
+
+class TestInfoByTagEdgeCases:
+    """Edge cases for info_by_tag."""
+
+    def test_info_by_tag_special_chars_in_tag(self, index_dir: Path):
+        """Test info_by_tag with special characters in tag."""
+        file_path = index_dir / "special_tag.md"
+        file_path.write_text("Special tag content.", encoding="utf-8")
+        add_file(index_dir, file_path, tag="test/v2.0 (draft)")
+        results = info_by_tag(index_dir, "test/v2.0 (draft)")
+        assert len(results) == 1
+
+    def test_info_by_tag_unicode_tag(self, index_dir: Path):
+        """Test info_by_tag with unicode tag."""
+        file_path = index_dir / "unicode_tag.md"
+        file_path.write_text("Unicode tag content.", encoding="utf-8")
+        add_file(index_dir, file_path, tag="日本語")
+        results = info_by_tag(index_dir, "日本語")
+        assert len(results) == 1
 
     def test_info_after_update(self, index_dir: Path):
         """Test that info reflects updated content size after re-indexing."""

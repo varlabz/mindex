@@ -6,7 +6,6 @@ import sqlite3
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
-from _pytest.nodes import File
 
 DB_FILE = "mindex.sqlite"  # index file stored in vault directory
 
@@ -390,12 +389,8 @@ def main(argv: list[str] | None = None) -> None:
         raise FileNotFoundError(f"Index directory does not exist: {index_dir}")
 
     if args.command == "add":
-        file = args.file.expanduser()
-        if not file.exists():
-            raise FileNotFoundError(f"File does not exist: {file}")
-
-        add_file(index_dir, file, tag=args.tag)
-        print(f"Indexed: {file}")
+        add_file(index_dir, args.file.expanduser(), tag=args.tag)
+        print(f"Indexed: {args.file}")
 
     elif args.command == "rm":
         del_file(index_dir, args.file.expanduser())

@@ -3,9 +3,9 @@ name: llm-index
 description: "Search indexed files and extract information using mindex: search, fsearch, read, and add files to index."
 argument-hint: "request"
 allowed-tools: shell
-compatibility: Requires uv.
+compatibility: Requires uv (uvx).
 metadata:
-  tools: "uv, mindex"
+  tools: "uv (uvx), mindex"
   index: "SQLite FTS5"
 ---
 

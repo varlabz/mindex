@@ -34,15 +34,15 @@ def add_file(index_dir: Path, file_path: str) -> int:
             file_hash = hashlib.sha256(content.encode()).hexdigest()
             conn.execute(
                 """
-                INSERT INTO docs (path, content, size, hash, tag)
-                VALUES (?, ?, ?, ?, ?)
+                INSERT INTO docs (path, content, size, hash)
+                VALUES (?, ?, ?, ?)
                 ON CONFLICT(path) DO UPDATE SET
                     content = excluded.content,
                     size = excluded.size,
                     hash = excluded.hash,
                     updated_at = datetime('now')
             """,
-                (str(fp.absolute()), content, len(content), file_hash, None),
+                (str(fp.absolute()), content, len(content), file_hash),
             )
             count += 1
         conn.commit()

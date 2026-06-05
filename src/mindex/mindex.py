@@ -19,7 +19,7 @@ def main(argv: list[str] | None = None) -> None:
     """Command-line interface for mindex operations."""
     parser = argparse.ArgumentParser(
         prog="mindex",
-        description="SQLite FTS5-based wiki search index",
+        description="SQLite FTS5-based search index",
     )
     parser.add_argument(
         "--index-dir",
@@ -38,24 +38,13 @@ def main(argv: list[str] | None = None) -> None:
     p_del = sub.add_parser("rm", help="Remove a file from the index")
     p_del.add_argument("path", type=str, help="File path or glob pattern to remove from the index (e.g., \"~/*.md\")")
 
-    # search
-    p_search = sub.add_parser("search", help="Search indexed files via FTS5")
-    p_search.add_argument("query", help="Full-text search query (minimum 3 characters)")
-    p_search.add_argument("path", nargs="?", default=None, help="Filter by file path (wildcard, e.g. '*.md')")
-    p_search.add_argument("-n", "--limit", type=int, default=10, help="Max results")
-    p_search.add_argument(
-        "-f",
-        "--format",
-        choices=["json", "text"],
-        default="json",
-        help="Output format (default: json)",
-    )
-
-    # info
-    p_info = sub.add_parser("info", help="Show info about an indexed files")
+    # ls / list
+    p_info = sub.add_parser("ls", aliases=["list"], help="List indexed files")
     p_info.add_argument(
         "path",
+        nargs="?",
         type=str,
+        default="*",
         help='File path or glob pattern to filter indexed files (e.g., "~/*.md")',
     )
     p_info.add_argument(
@@ -78,6 +67,32 @@ def main(argv: list[str] | None = None) -> None:
         type=int,
         default=4000,
         help="Number of characters to read (default: 4000)",
+    )
+
+    # search
+    p_search = sub.add_parser("search", help="Search indexed files via FTS5")
+    p_search.add_argument("query", help="Full-text search query (minimum 3 characters)")
+    p_search.add_argument("path", nargs="?", default=None, help="Filter by file path (wildcard, e.g. '*.md')")
+    p_search.add_argument("-n", "--limit", type=int, default=10, help="Max results")
+    p_search.add_argument(
+        "-f",
+        "--format",
+        choices=["json", "text"],
+        default="json",
+        help="Output format (default: json)",
+    )
+
+    # file search
+    p_sf = sub.add_parser("fsearch", help="Search within an indexed file")
+    p_sf.add_argument("query", help="Search query")
+    p_sf.add_argument("path", type=Path, help="Path to the indexed file to search")
+    p_sf.add_argument("-n", "--limit", type=int, default=10, help="Max results")
+    p_sf.add_argument(
+        "-f",
+        "--format",
+        choices=["json", "text"],
+        default="json",
+        help="Output format (default: json)",
     )
 
     # lint
@@ -105,18 +120,6 @@ def main(argv: list[str] | None = None) -> None:
         help="Delete records for files that no longer exist on disk",
     )
 
-    # file search
-    p_sf = sub.add_parser("fsearch", help="Search within an indexed file")
-    p_sf.add_argument("query", help="Search query")
-    p_sf.add_argument("path", type=Path, help="Path to the indexed file to search")
-    p_sf.add_argument("-n", "--limit", type=int, default=10, help="Max results")
-    p_sf.add_argument(
-        "-f",
-        "--format",
-        choices=["json", "text"],
-        default="json",
-        help="Output format (default: json)",
-    )
 
     args = parser.parse_args(argv)
 
@@ -124,7 +127,6 @@ def main(argv: list[str] | None = None) -> None:
         parser.print_help()
         return
 
-    # Expand ~ in index_dir to home directory
     index_dir = args.index_dir.expanduser()
     if not index_dir.exists():
         raise FileNotFoundError(f"Index directory does not exist: {index_dir}")
@@ -139,7 +141,7 @@ def main(argv: list[str] | None = None) -> None:
         count = del_file(index_dir, path)
         print(f"Removed: {args.path} ({count} record{'s' if count != 1 else ''})")
 
-    elif args.command == "info":
+    elif args.command == "ls" or args.command == "list":
         path = str(Path(args.path).expanduser().absolute())
         results = info_by_file(index_dir, path)
         print_info(results, args.format)

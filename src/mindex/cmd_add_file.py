@@ -30,8 +30,10 @@ def add_file(index_dir: Path, file_path: str) -> int:
             if not fp.is_file():
                 continue
 
+            # check hash to avoid re-indexing
             content = fp.read_text(encoding="utf-8")
             file_hash = hashlib.sha256(content.encode()).hexdigest()
+            before = conn.total_changes
             conn.execute(
                 """
                 INSERT INTO docs (path, content, size, hash)
@@ -41,10 +43,13 @@ def add_file(index_dir: Path, file_path: str) -> int:
                     size = excluded.size,
                     hash = excluded.hash,
                     updated_at = datetime('now')
+                WHERE docs.hash IS NULL OR docs.hash != ?
             """,
-                (str(fp.absolute()), content, len(content), file_hash),
+                (str(fp.absolute()), content, len(content), file_hash, file_hash),
             )
-            count += 1
+            if conn.total_changes > before:
+                count += 1
+
         conn.commit()
 
     return count

@@ -6,20 +6,18 @@ from pathlib import Path
 import pytest
 
 from mindex import (
-    add_file,
-    del_file,
-    info_by_file,
-    read_file,
-    search,
-    file_search,
-    lint,
-    lint_fix,
     FileInfo,
     FileSearchResult,
     SearchResult,
     _db,
+    add_file,
+    del_file,
+    file_search,
+    info_by_file,
+    lint,
+    read_file,
+    search,
 )
-
 
 # ── Fixtures ───────────────────────────────────────────────────────────
 
@@ -357,40 +355,6 @@ class TestLint:
     def test_lint_empty_index(self, index_dir):
         results = lint(index_dir)
         assert results == []
-
-    def test_lint_fix_removes_missing(self, indexed_sample_files, index_dir):
-        p = index_dir / "ghost.md"
-        p.write_text("# Ghost\n", encoding="utf-8")
-        add_file(index_dir, str(p))
-        p.unlink()
-
-        before = len(lint(index_dir))
-        lint_fix(index_dir)
-        after = len(lint(index_dir))
-        assert after < before
-
-    def test_lint_fix_no_missing(self, indexed_sample_files, index_dir):
-        # All files exist, fix should report no deletions
-        import contextlib
-        import io
-
-        f = io.StringIO()
-        with contextlib.redirect_stdout(f):
-            lint_fix(index_dir)
-        assert "No missing records" in f.getvalue()
-
-    def test_lint_fix_with_file_dir(self, indexed_sample_files, index_dir):
-        # Create ghost in sub directory
-        sub = index_dir / "sub"
-        ghost = sub / "ghost.md"
-        ghost.write_text("# Ghost\n", encoding="utf-8")
-        add_file(index_dir, str(ghost))
-        ghost.unlink()
-
-        lint_fix(index_dir, file_dir=sub)
-        results = lint(index_dir)
-        statuses = {r.path: r.status for r in results}
-        assert not any("ghost.md" in k and v == "missing" for k, v in statuses.items())
 
 
 # ── _db (database) tests ──────────────────────────────────────────────

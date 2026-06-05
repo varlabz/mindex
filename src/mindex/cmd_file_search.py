@@ -47,6 +47,28 @@ def _extract_snippets(highlighted: str, limit: int) -> list[FileSearchResult]:
     return results
 
 
+def print_file_search_results(results: list[FileSearchResult], fmt: str) -> None:
+    """Print a list of FileSearchResult records in the given format.
+
+    Args:
+        results: List of FileSearchResult records to print.
+        fmt: Output format - "json" or "text" (default: "json").
+    """
+    if not results:
+        if fmt == "json":
+            print("[]")
+        else:
+            print("No results.")
+        return
+    if fmt == "json":
+        print(json.dumps([asdict(r) for r in results], indent=2))
+    else:
+        for r in results:
+            print("-" * 20)
+            for k, v in asdict(r).items():
+                print(f"{k}: {v or '-'}")
+
+
 def file_search(
     index_dir: Path, file_path: str, query: str, limit: int = 10
 ) -> list[FileSearchResult]:
@@ -64,7 +86,10 @@ def file_search(
             JOIN docs d ON docs_fts.rowid = d.id
             WHERE docs_fts MATCH ? AND d.path = ?
             """,
-            (fts_query, file_path,),
+            (
+                fts_query,
+                file_path,
+            ),
         ).fetchone()
         if not row or not row["h"]:
             return []

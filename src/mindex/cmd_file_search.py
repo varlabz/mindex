@@ -1,6 +1,7 @@
 """File-level search: FTS5 highlight-based search within a single indexed file."""
 
-from dataclasses import dataclass
+import json
+from dataclasses import asdict, dataclass
 from pathlib import Path
 
 from mindex.cmd_search import _escape_fts5

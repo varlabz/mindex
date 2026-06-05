@@ -133,7 +133,7 @@ class TestDelFile:
     def test_del_removes_from_search(self, indexed_sample_files, index_dir):
         add_file(index_dir, str(indexed_sample_files["test1.md"]))
         del_file(index_dir, str(indexed_sample_files["test1.md"]))
-        results = search(index_dir, "hello")
+        results = search(index_dir, "hello", file_path=None, limit=100)
         assert all("test1.md" not in r.path for r in results)
 
     def test_del_glob_no_match(self, index_dir):
@@ -218,47 +218,47 @@ class TestReadFile:
 
 class TestSearch:
     def test_search_basic(self, indexed_sample_files, index_dir):
-        results = search(index_dir, "hello")
+        results = search(index_dir, "hello", file_path=None, limit=100)
         assert len(results) >= 1
         assert any("test1.md" in r.path for r in results)
 
     def test_search_no_results(self, indexed_sample_files, index_dir):
-        results = search(index_dir, "zzzzzzzzzzzzzz")
+        results = search(index_dir, "zzzzzzzzzzzzzz", file_path=None, limit=100)
         assert results == []
 
     def test_search_empty_query_raises(self, indexed_sample_files, index_dir):
         with pytest.raises(ValueError, match="Query cannot be empty"):
-            search(index_dir, "")
+            search(index_dir, "", file_path=None, limit=100)
 
     def test_search_whitespace_only_raises(self, indexed_sample_files, index_dir):
         with pytest.raises(ValueError, match="Query cannot be empty"):
-            search(index_dir, "   ")
+            search(index_dir, "   ", file_path=None, limit=100)
 
     def test_search_too_short_raises(self, indexed_sample_files, index_dir):
         with pytest.raises(ValueError, match="Query too short"):
-            search(index_dir, "ab")
+            search(index_dir, "ab", file_path=None, limit=100)
 
     def test_search_exact_3_chars(self, indexed_sample_files, index_dir):
         # "the" is 3 chars — should work
-        results = search(index_dir, "the")
+        results = search(index_dir, "the", file_path=None, limit=100)
         # May or may not find results depending on content, but shouldn't raise
         assert isinstance(results, list)
 
     def test_search_with_file_filter(self, indexed_sample_files, index_dir):
-        results = search(index_dir, "another", file_path="*test2*")
+        results = search(index_dir, "another", file_path="*test2*", limit=100)
         assert len(results) >= 1
         assert any("test2.md" in r.path for r in results)
 
     def test_search_with_file_filter_no_match(self, indexed_sample_files, index_dir):
-        results = search(index_dir, "hello", file_path="*nonexistent*")
+        results = search(index_dir, "hello", file_path="*nonexistent*", limit=100)
         assert results == []
 
     def test_search_with_limit(self, indexed_sample_files, index_dir):
-        results = search(index_dir, "file", limit=1)
+        results = search(index_dir, "file", file_path=None, limit=1)
         assert len(results) <= 1
 
     def test_search_result_fields(self, indexed_sample_files, index_dir):
-        results = search(index_dir, "hello")
+        results = search(index_dir, "hello", file_path=None, limit=100)
         r = results[0]
         assert isinstance(r, SearchResult)
         assert isinstance(r.path, str)
@@ -267,16 +267,16 @@ class TestSearch:
 
     def test_search_special_fts_chars(self, indexed_sample_files, index_dir):
         # Test that FTS special chars are properly escaped
-        results = search(index_dir, '"hello"')
+        results = search(index_dir, '"hello"', file_path=None, limit=100)
         assert isinstance(results, list)
 
     def test_search_double_quotes_in_query(self, indexed_sample_files, index_dir):
-        results = search(index_dir, '"test"')
+        results = search(index_dir, '"test"', file_path=None, limit=100)
         assert isinstance(results, list)
 
     def test_search_case_insensitive(self, indexed_sample_files, index_dir):
-        results_lower = search(index_dir, "hello")
-        results_upper = search(index_dir, "HELLO")
+        results_lower = search(index_dir, "hello", file_path=None, limit=100)
+        results_upper = search(index_dir, "HELLO", file_path=None, limit=100)
         # FTS5 is case-insensitive by default
         assert len(results_lower) == len(results_upper)
 
@@ -397,14 +397,14 @@ class TestIntegration:
         add_file(index_dir, str(p))
 
         # Search should find it
-        results = search(index_dir, "cycle")
+        results = search(index_dir, "cycle", file_path=None, limit=100)
         assert len(results) >= 1
 
         # Delete it
         del_file(index_dir, str(p))
 
         # Search should no longer find it
-        results = search(index_dir, "cycle")
+        results = search(index_dir, "cycle", file_path=None, limit=100)
         assert len(results) == 0
 
     def test_add_update_search_cycle(self, index_dir):
@@ -417,7 +417,7 @@ class TestIntegration:
         add_file(index_dir, str(p))
 
         # Search should find updated content
-        results = search(index_dir, "updated")
+        results = search(index_dir, "updated", file_path=None, limit=100)
         assert len(results) >= 1
 
     def test_full_workflow(self, index_dir):
@@ -432,7 +432,7 @@ class TestIntegration:
         assert len(infos) == 5
 
         # Search
-        results = search(index_dir, "document", limit=3)
+        results = search(index_dir, "document", file_path=None, limit=3)
         assert len(results) <= 3
 
         # Read a file
@@ -462,7 +462,7 @@ class TestIntegration:
         p.write_text("# Unicode Test\nHello 世界！ مرحبا 🌍\n", encoding="utf-8")
         add_file(index_dir, str(p))
 
-        results = search(index_dir, "unicode")
+        results = search(index_dir, "unicode", file_path=None, limit=100)
         assert len(results) >= 1
 
         content = read_file(index_dir, str(p), start=0, size=100)
@@ -474,7 +474,7 @@ class TestIntegration:
         p.write_text(large_content, encoding="utf-8")
         add_file(index_dir, str(p))
 
-        results = search(index_dir, "line")
+        results = search(index_dir, "line", file_path=None, limit=100)
         assert len(results) >= 1
 
         content = read_file(index_dir, str(p), start=0, size=100)
@@ -507,7 +507,7 @@ class TestIntegration:
         p.write_text("# Numbers\n123 456 789\n", encoding="utf-8")
         add_file(index_dir, str(p))
 
-        results = search(index_dir, "123")
+        results = search(index_dir, "123", file_path=None, limit=100)
         assert len(results) >= 1
 
     def test_multiple_add_same_file(self, index_dir):

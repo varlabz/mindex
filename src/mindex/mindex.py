@@ -142,7 +142,7 @@ def main(argv: list[str] | None = None) -> None:
         print_info(results, args.format)
 
     elif args.command == "search":
-        path = str(Path(args.path).expanduser().absolute()) if args.path else ""
+        path = str(Path(args.path).expanduser().absolute()) if args.path else None
         results = search(index_dir, args.query, file_path=path, limit=args.limit)
         print_search_results(results, args.format)
 

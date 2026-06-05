@@ -24,7 +24,7 @@ def _escape_fts5(query: str) -> str:
     return f'"{escaped}"'
 
 
-def search(index_dir: Path, query: str, file_path: str = "", limit: int = 10) -> list[SearchResult]:
+def search(index_dir: Path, query: str, file_path: str | None, limit: int) -> list[SearchResult]:
     """Search using FTS5, optionally filtering by file_path (wildcard format) field."""
     stripped = query.strip()
     if not stripped:
@@ -56,7 +56,6 @@ def search(index_dir: Path, query: str, file_path: str = "", limit: int = 10) ->
         params.append(limit)
 
         rows = conn.execute(sql, params).fetchall()
-
         return [SearchResult(**row) for row in rows]
 
 

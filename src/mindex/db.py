@@ -1,6 +1,5 @@
 """Database schema and connection management."""
 
-import os
 import sqlite3
 from pathlib import Path
 

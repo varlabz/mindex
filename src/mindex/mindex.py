@@ -56,17 +56,21 @@ def main(argv: list[str] | None = None) -> None:
     )
 
     # read
-    p_read = sub.add_parser("read", help="Read file content from the index")
+    p_read = sub.add_parser("read", help="Read file content from the index in chunks")
     p_read.add_argument("path", type=Path, help="Path to the indexed file to read")
     p_read.add_argument(
-        "-p", "--position", type=int, default=0, help="Starting character offset (default: 0)"
+        "-p",
+        "--position",
+        type=int,
+        default=0,
+        help="Starting character offset of the chunk (default: 0)",
     )
     p_read.add_argument(
         "-s",
         "--size",
         type=int,
         default=4000,
-        help="Number of characters to read (default: 4000)",
+        help="Number of characters to read of the chunk (default: 4000)",
     )
 
     # search

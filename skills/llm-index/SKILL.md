@@ -1,7 +1,7 @@
 ---
 name: llm-index
 description: "Search indexed files and extract information using mindex: search, fsearch, read, and add files to index."
-argument-hint: "request"
+argument-hint: "query"
 allowed-tools: shell
 compatibility: Requires uv (uvx).
 metadata:
@@ -22,6 +22,17 @@ All commands use `uvx` to run `mindex` from the remote Git repo — no permanent
 uvx --from git+https://github.com/varlabz/mindex mindex --index-dir <index_dir> <subcommand> [options]
 ```
 
+---
+
+## Query (default action)
+
+Use query strategy to search in the index.
+- For full-text search using `mindex search`.
+- For search in a file use `mindex fsearch`.
+- For reading file content in chunks use `mindex read`.
+- Try different query requests to find the best results.
+- Try different tools parameters to fine-tune the search.
+- Return relevant result in short form if not requested for detailed result explicitly.
 ---
 
 ## Add Files to Index
@@ -126,6 +137,7 @@ mindex --index-dir <index_dir> fsearch "fts5" ~/notes/sqlite.md --format text --
 Read the content of an indexed file, optionally from a specific position.
 Can be used to read large files in chunks by specifying `--position` and `--size` to avoid loading the entire file at once.
 Reads from the index database — the file must be indexed first with `add`.
+Don't set `--size` to big numbers more than `10000` to avoid loading a lot of data at once.
 
 ```bash
 mindex --index-dir <index_dir> read <file_path> [options]
@@ -162,7 +174,7 @@ Show metadata about indexed files — path, size, last updated timestamp.
 Useful for checking whether a file is indexed, listing files matching a glob pattern, or reviewing file properties without reading the full content.
 
 ```bash
-mindex --index-dir <index_dir> info <file_or_glob> [options]
+mindex --index-dir <index_dir> list <file_or_glob> [options]
 ```
 
 **Options:**
@@ -175,13 +187,13 @@ mindex --index-dir <index_dir> info <file_or_glob> [options]
 
 ```bash
 # Show info for a specific file
-mindex --index-dir <index_dir> info notes/sqlite.md
+mindex --index-dir <index_dir> list notes/sqlite.md
 
 # List info for files matching a glob pattern
-mindex --index-dir <index_dir> info 'notes/*.md'
+mindex --index-dir <index_dir> list 'notes/*.md'
 
 # Plain text output
-mindex --index-dir <index_dir> info notes/sqlite.md --format text
+mindex --index-dir <index_dir> list notes/sqlite.md --format text
 ```
 
 ---

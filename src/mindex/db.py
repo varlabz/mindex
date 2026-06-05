@@ -21,7 +21,7 @@ class _db:
 
     @staticmethod
     def get_db(index_dir: Path) -> sqlite3.Connection:
-        conn = sqlite3.connect(os.path.join(index_dir, DB_FILE))
+        conn = sqlite3.connect(index_dir / DB_FILE)
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA journal_mode=WAL")
         conn.execute("PRAGMA foreign_keys=ON")

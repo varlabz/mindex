@@ -127,22 +127,22 @@ def main(argv: list[str] | None = None) -> None:
         raise FileNotFoundError(f"Index directory does not exist: {index_dir}")
 
     if args.command == "add":
-        path = str(Path(args.path).expanduser().absolute())
+        path = str(Path(args.path).expanduser())
         count = add_file(index_dir, path)
         print(f"Indexed: {args.path} ({count} record{'s' if count != 1 else ''})")
 
     elif args.command == "rm":
-        path = str(Path(args.path).expanduser().absolute())
+        path = str(Path(args.path).expanduser())
         count = del_file(index_dir, path)
         print(f"Removed: {args.path} ({count} record{'s' if count != 1 else ''})")
 
     elif args.command == "ls" or args.command == "list":
-        path = str(Path(args.path).expanduser().absolute())
+        path = str(Path(args.path).expanduser())
         results = info_by_file(index_dir, path)
         print_info(results, args.format)
 
     elif args.command == "search":
-        path = str(Path(args.path).expanduser().absolute()) if args.path else None
+        path = str(Path(args.path).expanduser()) if args.path else None
         results = search(index_dir, args.query, file_path=path, limit=args.limit)
         print_search_results(results, args.format)
 

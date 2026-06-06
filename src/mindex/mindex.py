@@ -110,11 +110,11 @@ def main(argv: list[str] | None = None) -> None:
         "lint", help="Lint indexed files: check existence and directory membership"
     )
     p_lint.add_argument(
-        "file_dir",
-        type=Path,
-        nargs="?",
-        default=None,
-        help="Optional directory to verify files belong to",
+        "paths",
+        type=str,
+        nargs="*",
+        default=[],
+        help='Optional path or wildcard pattern(s) to filter files (e.g., "*.md" "sub/*")',
     )
     p_lint.add_argument(
         "-f",
@@ -167,8 +167,8 @@ def main(argv: list[str] | None = None) -> None:
         print(content)
 
     elif args.command == "lint":
-        file_dir = args.file_dir.expanduser() if args.file_dir else None
-        results = lint(index_dir, file_dir)
+        paths = [str(Path(p).expanduser()) for p in args.paths] if args.paths else None
+        results = lint(index_dir, paths)
         lint_output(results, args.format)
 
 

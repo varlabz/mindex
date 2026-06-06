@@ -566,13 +566,46 @@ class TestLint:
         assert any("ghost.md" in k and v == "missing" for k, v in statuses.items())
 
     def test_lint_with_file_dir_filter(self, indexed_sample_files, index_dir):
-        sub_dir = index_dir / "sub"
-        results = lint(index_dir, file_dir=sub_dir)
+        results = lint(index_dir, file_path=[str(index_dir / "sub/*")])
         assert all("sub/" in r.path for r in results)
+
+    def test_lint_with_multiple_patterns(self, indexed_sample_files, index_dir):
+        patterns = [str(index_dir / "test?.md"), str(index_dir / "sub/*")]
+        results = lint(index_dir, file_path=patterns)
+        assert len(results) == 3
+        assert all(r.status == "OK" for r in results)
 
     def test_lint_empty_index(self, index_dir):
         results = lint(index_dir)
         assert results == []
+
+    def test_lint_multiple_explicit_paths(self, indexed_sample_files, index_dir):
+        paths = [
+            str(indexed_sample_files["test1.md"]),
+            str(indexed_sample_files["sub/deep.md"]),
+        ]
+        results = lint(index_dir, file_path=paths)
+        assert len(results) == 2
+        assert all(r.status == "OK" for r in results)
+
+    def test_lint_mixed_glob_and_explicit(self, indexed_sample_files, index_dir):
+        paths = [
+            str(indexed_sample_files["test1.md"]),
+            str(index_dir / "sub/*"),
+        ]
+        results = lint(index_dir, file_path=paths)
+        assert len(results) == 2
+        assert all(r.status == "OK" for r in results)
+
+    def test_lint_partial_match_only(self, indexed_sample_files, index_dir):
+        results = lint(index_dir, file_path=[str(index_dir / "nonexistent/*")])
+        assert results == []
+
+    def test_lint_empty_paths_list(self, indexed_sample_files, index_dir):
+        """Empty list should return all files (same as None)."""
+        results = lint(index_dir, file_path=[])
+        assert len(results) == 3
+        assert all(r.status == "OK" for r in results)
 
 
 # ── _db (database) tests ──────────────────────────────────────────────

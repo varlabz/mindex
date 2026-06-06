@@ -13,32 +13,36 @@ class LintInfo:
     status: str
 
 
-def lint(index_dir: Path, file_dir: Path | None = None) -> list[LintInfo]:
+def lint(index_dir: Path, file_path: list[str] | None = None) -> list[LintInfo]:
     """Lint indexed files: check if they exist on disk.
 
     Args:
         index_dir: Path to the index directory.
-        file_dir: Optional directory to filter files by. Only files whose path
-            starts with this directory are returned.
+        file_path: Optional list of path or wildcard patterns to filter files by.
+            Supports glob-style wildcards (e.g. "*.md", "sub/*").
+            Only files matching at least one pattern are returned.
 
     Returns:
         List of LintInfo records with 'path' and 'status'.
     """
-    prefix = str((file_dir / "").absolute()) if file_dir is not None else None
     with _db(index_dir) as conn:
-        if prefix:
-            rows = conn.execute(
-                "SELECT path FROM docs WHERE SUBSTR(path, 1, LENGTH(?)) = ?",
-                (prefix, prefix),
-            ).fetchall()
-        else:
-            rows = conn.execute("SELECT path FROM docs").fetchall()
+        sql = "SELECT path FROM docs"
+        params: list[str] = []
+
+        if file_path:
+            clauses = []
+            for fd in file_path:
+                clauses.append("path GLOB ?")
+                params.append(fd)
+            sql += " WHERE " + " OR ".join(clauses)
+
+        rows = conn.execute(sql, params).fetchall()
 
     results = []
     for row in rows:
-        file_path = Path(row["path"])
-        status = "OK" if file_path.is_file() else "missing"
-        results.append(LintInfo(path=str(file_path), status=status))
+        fp = Path(row["path"])
+        status = "OK" if fp.is_file() else "missing"
+        results.append(LintInfo(path=str(fp), status=status))
 
     return results
 

@@ -175,6 +175,56 @@ class TestAddFile:
         with pytest.raises(FileNotFoundError, match="No files matched"):
             add_file(index_dir, [str(empty_dir / "*.md")])
 
+    # ── Hidden file tests ────────────────────────────────────────────
+
+    def test_add_hidden_file_explicit_path_is_skipped(self, index_dir):
+        """A hidden file (name starting with '.') passed explicitly is silently skipped."""
+        p = index_dir / ".hidden.md"
+        p.write_text("# Hidden\n", encoding="utf-8")
+        count = add_file(index_dir, [str(p)])
+        assert count == 0
+
+    def test_add_hidden_file_glob_is_skipped(self, index_dir):
+        """Hidden files matched by a glob are silently skipped."""
+        # Normal file
+        (index_dir / "visible.md").write_text("# Visible\n", encoding="utf-8")
+        # Hidden file
+        (index_dir / ".hidden.md").write_text("# Hidden\n", encoding="utf-8")
+        count = add_file(index_dir, [str(index_dir / "*.md")])
+        # Only visible.md should be indexed
+        assert count == 1
+
+    def test_add_hidden_file_does_not_raise(self, index_dir):
+        """Passing only hidden files should not raise — they are just skipped."""
+        p = index_dir / ".config"
+        p.write_text("config\n", encoding="utf-8")
+        count = add_file(index_dir, [str(p)])
+        assert count == 0
+
+    def test_add_file_in_hidden_directory_is_indexed(self, index_dir):
+        """A non-hidden file inside a .-prefixed directory should still be indexed."""
+        nested = index_dir / ".config" / "settings.md"
+        nested.parent.mkdir(parents=True, exist_ok=True)
+        nested.write_text("# Settings\n", encoding="utf-8")
+        count = add_file(index_dir, [str(nested)])
+        assert count == 1
+
+    def test_add_glob_in_hidden_directory(self, index_dir):
+        """Glob matching files inside a .-prefixed directory should index them."""
+        nested = index_dir / ".config" / "settings.md"
+        nested.parent.mkdir(parents=True, exist_ok=True)
+        nested.write_text("# Settings\n", encoding="utf-8")
+        count = add_file(index_dir, [str(index_dir / ".config" / "*.md")])
+        assert count == 1
+
+    def test_add_only_hidden_files_via_glob(self, index_dir):
+        """Glob matching only hidden files should not raise and return 0."""
+        p = index_dir / ".hidden.md"
+        p.write_text("# Hidden\n", encoding="utf-8")
+        # glob with a dot prefix
+        count = add_file(index_dir, [str(index_dir / ".hidden.md")])
+        assert count == 0
+
 
 # ── del_file tests ─────────────────────────────────────────────────────
 

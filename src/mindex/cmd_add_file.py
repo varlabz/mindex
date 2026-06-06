@@ -31,7 +31,8 @@ def add_file(index_dir: Path, file_path: list[str]) -> int:
     count = 0
     with _db(index_dir) as conn:
         for fp in map(Path, matched):
-            if not fp.is_file():
+            # skip hidden files (e.g., .git, .venv)
+            if not fp.is_file() or fp.name.startswith("."):
                 continue
 
             # check hash to avoid re-indexing

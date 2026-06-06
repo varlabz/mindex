@@ -216,7 +216,7 @@ class TestDelFile:
         assert count == 2
 
         # Verify they're gone
-        infos = info_by_file(index_dir, "*")
+        infos = info_by_file(index_dir, ["*"])
         paths = [i.path for i in infos]
         assert not any(p.endswith("test1.md") for p in paths)
         assert not any(p.endswith("test2.md") for p in paths)
@@ -234,7 +234,7 @@ class TestDelFile:
         )
         assert count == 2
 
-        infos = info_by_file(index_dir, "*")
+        infos = info_by_file(index_dir, ["*"])
         paths = [i.path for i in infos]
         assert not any(p.endswith("test1.md") for p in paths)
         assert not any(p.endswith("test2.md") for p in paths)
@@ -257,7 +257,7 @@ class TestDelFile:
         )
         assert count == 2  # extra.txt + sub/deep.md
 
-        infos = info_by_file(index_dir, "*")
+        infos = info_by_file(index_dir, ["*"])
         paths = [i.path for i in infos]
         assert not any(p.endswith("extra.txt") for p in paths)
         assert not any(p.endswith("sub/deep.md") for p in paths)
@@ -275,21 +275,21 @@ class TestDelFile:
 
 class TestInfoByFile:
     def test_list_all_files(self, indexed_sample_files, index_dir):
-        results = info_by_file(index_dir, "*")
+        results = info_by_file(index_dir, ["*"])
         assert len(results) == 3
         assert all(isinstance(r, FileInfo) for r in results)
 
     def test_filter_by_glob(self, indexed_sample_files, index_dir):
-        results = info_by_file(index_dir, str(index_dir / "test1.md"))
+        results = info_by_file(index_dir, [str(index_dir / "test1.md")])
         assert len(results) == 1
         assert "test1.md" in results[0].path
 
     def test_filter_by_nonexistent(self, indexed_sample_files, index_dir):
-        results = info_by_file(index_dir, "/nonexistent/*.md")
+        results = info_by_file(index_dir, ["/nonexistent/*.md"])
         assert len(results) == 0
 
     def test_info_fields(self, indexed_sample_files, index_dir):
-        results = info_by_file(index_dir, str(indexed_sample_files["test1.md"]))
+        results = info_by_file(index_dir, [str(indexed_sample_files["test1.md"])])
         r = results[0]
         assert isinstance(r.path, str)
         assert isinstance(r.size, int)
@@ -297,9 +297,51 @@ class TestInfoByFile:
         assert isinstance(r.updated_at, str)
 
     def test_info_by_subdirectory(self, indexed_sample_files, index_dir):
-        results = info_by_file(index_dir, str(index_dir / "sub/*"))
+        results = info_by_file(index_dir, [str(index_dir / "sub/*")])
         assert len(results) == 1
         assert "deep.md" in results[0].path
+
+    def test_multiple_absolute_paths(self, indexed_sample_files, index_dir):
+        results = info_by_file(
+            index_dir,
+            [
+                str(index_dir / "test1.md"),
+                str(index_dir / "test2.md"),
+            ],
+        )
+        assert len(results) == 2
+        paths = {r.path for r in results}
+        assert any(p.endswith("test1.md") for p in paths)
+        assert any(p.endswith("test2.md") for p in paths)
+
+    def test_multiple_globs(self, indexed_sample_files, index_dir):
+        results = info_by_file(
+            index_dir,
+            [
+                str(index_dir / "test?.md"),
+                str(index_dir / "sub/*"),
+            ],
+        )
+        assert len(results) == 3
+
+    def test_multiple_mixed_existing_and_nonexistent(self, indexed_sample_files, index_dir):
+        results = info_by_file(
+            index_dir,
+            [
+                str(index_dir / "test1.md"),
+                "/nonexistent/*.md",
+                str(index_dir / "test2.md"),
+            ],
+        )
+        assert len(results) == 2
+
+    def test_empty_list_returns_all(self, indexed_sample_files, index_dir):
+        results = info_by_file(index_dir, [])
+        assert len(results) == 3
+
+    def test_none_returns_all(self, indexed_sample_files, index_dir):
+        results = info_by_file(index_dir, None)
+        assert len(results) == 3
 
 
 # ── read_file tests ────────────────────────────────────────────────────
@@ -604,7 +646,7 @@ class TestIntegration:
             add_file(index_dir, [str(p)])
 
         # List all
-        infos = info_by_file(index_dir, "*")
+        infos = info_by_file(index_dir, ["*"])
         assert len(infos) == 5
 
         # Search
@@ -674,7 +716,7 @@ class TestIntegration:
         deep.write_text("# Deep\n", encoding="utf-8")
         add_file(index_dir, [str(deep)])
 
-        results = info_by_file(index_dir, str(deep))
+        results = info_by_file(index_dir, [str(deep)])
         assert len(results) == 1
 
     def test_search_with_numbers(self, index_dir):
@@ -693,5 +735,5 @@ class TestIntegration:
         add_file(index_dir, [str(p)])
 
         # Should only have one record
-        infos = info_by_file(index_dir, str(p))
+        infos = info_by_file(index_dir, [str(p)])
         assert len(infos) == 1

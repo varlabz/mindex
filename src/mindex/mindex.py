@@ -46,11 +46,10 @@ def main(argv: list[str] | None = None) -> None:
     # ls / list
     p_info = sub.add_parser("ls", aliases=["list"], help="List indexed files")
     p_info.add_argument(
-        "path",
-        nargs="?",
-        type=str,
-        default="*",
-        help='File path or glob pattern to filter indexed files (e.g., "~/*.md")',
+        "paths",
+        nargs="*",
+        default=[],
+        help='File path(s) or glob pattern(s) to filter indexed files (e.g., "~/*.md")',
     )
     p_info.add_argument(
         "-f",
@@ -84,7 +83,7 @@ def main(argv: list[str] | None = None) -> None:
     p_search.add_argument(
         "paths", nargs="*", default=[], help="Filter by file path(s) (wildcard, e.g. '*.md')"
     )
-    p_search.add_argument("-n", "--limit", type=int, default=10, help="Max results")
+    p_search.add_argument("-n", "--limit", type=int, default=25, help="Max results")
     p_search.add_argument(
         "-f",
         "--format",
@@ -148,8 +147,8 @@ def main(argv: list[str] | None = None) -> None:
         )
 
     elif args.command == "ls" or args.command == "list":
-        path = str(Path(args.path).expanduser())
-        results = info_by_file(index_dir, path)
+        paths = [str(Path(p).expanduser()) for p in args.paths] if args.paths else None
+        results = info_by_file(index_dir, paths)
         print_info(results, args.format)
 
     elif args.command == "search":

@@ -53,7 +53,7 @@ def sample_files(index_dir):
 def indexed_sample_files(sample_files, index_dir):
     """Index the sample files and return paths."""
     for name, path in sample_files.items():
-        add_file(index_dir, str(path))
+        add_file(index_dir, [str(path)])
     return sample_files
 
 
@@ -62,54 +62,118 @@ def indexed_sample_files(sample_files, index_dir):
 
 class TestAddFile:
     def test_add_single_file(self, index_dir, sample_files):
-        count = add_file(index_dir, str(sample_files["test1.md"]))
+        count = add_file(index_dir, [str(sample_files["test1.md"])])
         assert count == 1
 
     def test_add_via_glob(self, index_dir, sample_files):
-        count = add_file(index_dir, str(index_dir / "*.md"))
+        count = add_file(index_dir, [str(index_dir / "*.md")])
         # Only top-level files match *.md (not sub/deep.md)
         assert count == 2
 
     def test_add_nested_file(self, index_dir, sample_files):
-        count = add_file(index_dir, str(sample_files["sub/deep.md"]))
+        count = add_file(index_dir, [str(sample_files["sub/deep.md"])])
         assert count == 1
 
     def test_add_nonexistent_file_raises(self, index_dir):
         with pytest.raises(FileNotFoundError, match="No files matched"):
-            add_file(index_dir, "/nonexistent/path/file.md")
+            add_file(index_dir, ["/nonexistent/path/file.md"])
 
     def test_add_nonexistent_glob_raises(self, index_dir):
         with pytest.raises(FileNotFoundError, match="No files matched"):
-            add_file(index_dir, str(index_dir / "*.nonexistent"))
+            add_file(index_dir, [str(index_dir / "*.nonexistent")])
 
     def test_add_updates_existing(self, index_dir, sample_files):
-        add_file(index_dir, str(sample_files["test1.md"]))
+        add_file(index_dir, [str(sample_files["test1.md"])])
         # Modify file
         sample_files["test1.md"].write_text("# Updated\nNew content.\n", encoding="utf-8")
-        count = add_file(index_dir, str(sample_files["test1.md"]))
+        count = add_file(index_dir, [str(sample_files["test1.md"])])
         assert count == 1  # hash changed, so it's re-indexed
 
     def test_add_no_hash_change_no_reindex(self, index_dir, sample_files):
-        count1 = add_file(index_dir, str(sample_files["test1.md"]))
-        count2 = add_file(index_dir, str(sample_files["test1.md"]))
+        count1 = add_file(index_dir, [str(sample_files["test1.md"])])
+        count2 = add_file(index_dir, [str(sample_files["test1.md"])])
         assert count1 == 1
         assert count2 == 0  # same content, no re-index
 
     def test_add_special_chars_in_name(self, index_dir):
         p = index_dir / "file [with] (special).md"
         p.write_text("# Special\n", encoding="utf-8")
-        count = add_file(index_dir, str(p))
+        count = add_file(index_dir, [str(p)])
         assert count == 1
 
     def test_add_glob_no_match(self, index_dir):
         with pytest.raises(FileNotFoundError, match="No files matched"):
-            add_file(index_dir, str(index_dir / "does-not-match-*.xyz"))
+            add_file(index_dir, [str(index_dir / "does-not-match-*.xyz")])
 
     def test_add_multiple_files_glob(self, index_dir, sample_files):
         # glob.glob requires recursive=True for **, so "**/*.md" without it won't recurse
         # Test that add_file handles a glob that matches multiple files
-        count = add_file(index_dir, str(index_dir / "test*.md"))
+        count = add_file(index_dir, [str(index_dir / "test*.md")])
         assert count == 2  # test1.md and test2.md
+
+    def test_add_multiple_explicit_paths(self, index_dir, sample_files):
+        """Add multiple explicit files via list of paths."""
+        count = add_file(
+            index_dir,
+            [
+                str(sample_files["test1.md"]),
+                str(sample_files["test2.md"]),
+                str(sample_files["sub/deep.md"]),
+            ],
+        )
+        assert count == 3
+
+    def test_add_multiple_glob_patterns(self, index_dir, sample_files):
+        """Add files via multiple glob patterns."""
+        count = add_file(
+            index_dir,
+            [
+                str(index_dir / "test*.md"),
+                str(index_dir / "sub/*.md"),
+            ],
+        )
+        assert count == 3  # test1.md, test2.md, sub/deep.md
+
+    def test_add_mixed_glob_and_literal(self, index_dir, sample_files):
+        """Mix of explicit path and glob pattern."""
+        count = add_file(
+            index_dir,
+            [
+                str(sample_files["test1.md"]),
+                str(index_dir / "sub/*.md"),
+            ],
+        )
+        assert count == 2  # test1.md, sub/deep.md
+
+    def test_add_multiple_deduplicates_overlap(self, index_dir, sample_files):
+        """Overlapping patterns should not double-count files."""
+        count = add_file(
+            index_dir,
+            [
+                str(index_dir / "*.md"),
+                str(index_dir / "test*.md"),
+            ],
+        )
+        # *.md matches test1.md, test2.md; test*.md overlaps both
+        assert count == 2
+
+    def test_add_multiple_partial_failure(self, index_dir, sample_files):
+        """If *any* pattern fails to match, it should raise."""
+        with pytest.raises(FileNotFoundError, match="No files matched"):
+            add_file(
+                index_dir,
+                [
+                    str(sample_files["test1.md"]),
+                    str(index_dir / "nonexistent-*.xyz"),
+                ],
+            )
+
+    def test_add_multiple_empty_glob_in_list(self, index_dir):
+        """A glob in the list that matches nothing raises."""
+        empty_dir = index_dir / "empty"
+        empty_dir.mkdir()
+        with pytest.raises(FileNotFoundError, match="No files matched"):
+            add_file(index_dir, [str(empty_dir / "*.md")])
 
 
 # ── del_file tests ─────────────────────────────────────────────────────
@@ -131,7 +195,7 @@ class TestDelFile:
         assert count == 3  # SQL GLOB * matches / in paths
 
     def test_del_removes_from_search(self, indexed_sample_files, index_dir):
-        add_file(index_dir, str(indexed_sample_files["test1.md"]))
+        add_file(index_dir, [str(indexed_sample_files["test1.md"])])
         del_file(index_dir, str(indexed_sample_files["test1.md"]))
         results = search(index_dir, "hello", file_path=None, limit=100)
         assert all("test1.md" not in r.path for r in results)
@@ -318,7 +382,7 @@ class TestFileSearch:
     def test_file_search_on_empty_file(self, index_dir):
         p = index_dir / "empty.md"
         p.write_text("", encoding="utf-8")
-        add_file(index_dir, str(p))
+        add_file(index_dir, [str(p)])
         results = file_search(index_dir, str(p), "anything")
         assert results == []
 
@@ -340,7 +404,7 @@ class TestLint:
         # Add a file, then delete it from disk
         p = index_dir / "ghost.md"
         p.write_text("# Ghost\n", encoding="utf-8")
-        add_file(index_dir, str(p))
+        add_file(index_dir, [str(p)])
         p.unlink()  # delete from disk
 
         results = lint(index_dir)
@@ -394,7 +458,7 @@ class TestIntegration:
     def test_add_search_delete_cycle(self, index_dir):
         p = index_dir / "cycle.md"
         p.write_text("# Cycle Test\nThis file will be deleted.\n", encoding="utf-8")
-        add_file(index_dir, str(p))
+        add_file(index_dir, [str(p)])
 
         # Search should find it
         results = search(index_dir, "cycle", file_path=None, limit=100)
@@ -410,11 +474,11 @@ class TestIntegration:
     def test_add_update_search_cycle(self, index_dir):
         p = index_dir / "update.md"
         p.write_text("# Old Content\nFirst version.\n", encoding="utf-8")
-        add_file(index_dir, str(p))
+        add_file(index_dir, [str(p)])
 
         # Update content
         p.write_text("# New Content\nUpdated version.\n", encoding="utf-8")
-        add_file(index_dir, str(p))
+        add_file(index_dir, [str(p)])
 
         # Search should find updated content
         results = search(index_dir, "updated", file_path=None, limit=100)
@@ -425,7 +489,7 @@ class TestIntegration:
         for i in range(5):
             p = index_dir / f"doc{i}.md"
             p.write_text(f"# Document {i}\nContent for document number {i}.\n", encoding="utf-8")
-            add_file(index_dir, str(p))
+            add_file(index_dir, [str(p)])
 
         # List all
         infos = info_by_file(index_dir, "*")
@@ -460,7 +524,7 @@ class TestIntegration:
     def test_unicode_content(self, index_dir):
         p = index_dir / "unicode.md"
         p.write_text("# Unicode Test\nHello 世界！ مرحبا 🌍\n", encoding="utf-8")
-        add_file(index_dir, str(p))
+        add_file(index_dir, [str(p)])
 
         results = search(index_dir, "unicode", file_path=None, limit=100)
         assert len(results) >= 1
@@ -472,7 +536,7 @@ class TestIntegration:
         p = index_dir / "large.md"
         large_content = "# Large\n" + "\n".join(f"Line {i}" for i in range(1000)) + "\n"
         p.write_text(large_content, encoding="utf-8")
-        add_file(index_dir, str(p))
+        add_file(index_dir, [str(p)])
 
         results = search(index_dir, "line", file_path=None, limit=100)
         assert len(results) >= 1
@@ -483,7 +547,7 @@ class TestIntegration:
     def test_unicode_search(self, index_dir):
         p = index_dir / "cjk.md"
         p.write_text("# 日本語テスト\nこれはテストファイルです。\n", encoding="utf-8")
-        add_file(index_dir, str(p))
+        add_file(index_dir, [str(p)])
 
         # FTS5 with default tokenizer doesn't handle CJK phrase matching well.
         # The _escape_fts5 wraps in quotes for phrase match, which fails for CJK.
@@ -497,7 +561,7 @@ class TestIntegration:
         deep = index_dir / "a" / "b" / "c" / "d" / "e" / "deep.md"
         deep.parent.mkdir(parents=True, exist_ok=True)
         deep.write_text("# Deep\n", encoding="utf-8")
-        add_file(index_dir, str(deep))
+        add_file(index_dir, [str(deep)])
 
         results = info_by_file(index_dir, str(deep))
         assert len(results) == 1
@@ -505,7 +569,7 @@ class TestIntegration:
     def test_search_with_numbers(self, index_dir):
         p = index_dir / "numbers.md"
         p.write_text("# Numbers\n123 456 789\n", encoding="utf-8")
-        add_file(index_dir, str(p))
+        add_file(index_dir, [str(p)])
 
         results = search(index_dir, "123", file_path=None, limit=100)
         assert len(results) >= 1
@@ -513,9 +577,9 @@ class TestIntegration:
     def test_multiple_add_same_file(self, index_dir):
         p = index_dir / "multi.md"
         p.write_text("# Multi\n", encoding="utf-8")
-        add_file(index_dir, str(p))
-        add_file(index_dir, str(p))
-        add_file(index_dir, str(p))
+        add_file(index_dir, [str(p)])
+        add_file(index_dir, [str(p)])
+        add_file(index_dir, [str(p)])
 
         # Should only have one record
         infos = info_by_file(index_dir, str(p))

@@ -7,22 +7,26 @@ from pathlib import Path
 from mindex.db import _db
 
 
-def add_file(index_dir: Path, file_path: str) -> int:
+def add_file(index_dir: Path, file_path: list[str]) -> int:
     """Add or update file(s) in the index.
 
-    The *file_path* argument is treated as a glob/wildcard pattern, so it can
+    Each item in *file_path* is treated as a glob/wildcard pattern, so each can
     match one file, many files, or none (which raises ``FileNotFoundError``).
     """
-    matched = glob.glob(file_path)
-    # If nothing matched, try treating the path as a literal file (e.g., names
-    # containing glob special characters like [ ] ?)
-    if not matched:
-        literal = Path(file_path)
-        if literal.is_file():
-            matched = [str(literal)]
+    matched: set[str] = set()
+    for pattern in file_path:
+        hits = glob.glob(pattern)
+        # If nothing matched, try treating the path as a literal file (e.g., names
+        # containing glob special characters like [ ] ?)
+        if not hits:
+            literal = Path(pattern)
+            if literal.is_file():
+                hits = [str(literal)]
 
-    if not matched:
-        raise FileNotFoundError(f"No files matched pattern: {file_path}")
+        if not hits:
+            raise FileNotFoundError(f"No files matched pattern: {pattern}")
+
+        matched.update(hits)
 
     count = 0
     with _db(index_dir) as conn:

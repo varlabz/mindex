@@ -30,7 +30,9 @@ def main(argv: list[str] | None = None) -> None:
 
     # add
     p_add = sub.add_parser("add", help="Add or update a file in the index")
-    p_add.add_argument("path", type=str, help='File path or glob pattern to index (e.g., "~/*.md")')
+    p_add.add_argument(
+        "paths", type=str, nargs="+", help="File path(s) or glob pattern(s) to index (e.g., ~/*.md)"
+    )
 
     # rm
     p_del = sub.add_parser("rm", help="Remove a file from the index")
@@ -131,9 +133,9 @@ def main(argv: list[str] | None = None) -> None:
         raise FileNotFoundError(f"Index directory does not exist: {index_dir}")
 
     if args.command == "add":
-        path = str(Path(args.path).expanduser())
-        count = add_file(index_dir, path)
-        print(f"Indexed: {args.path} ({count} record{'s' if count != 1 else ''})")
+        paths = [str(Path(p).expanduser()) for p in args.paths]
+        count = add_file(index_dir, paths)
+        print(f"Indexed: {count} record{'s' if count != 1 else ''}")
 
     elif args.command == "rm":
         path = str(Path(args.path).expanduser())

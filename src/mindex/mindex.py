@@ -96,7 +96,7 @@ def main(argv: list[str] | None = None) -> None:
     p_sf = sub.add_parser("fsearch", help="Search within an indexed file")
     p_sf.add_argument("query", help="Search query")
     p_sf.add_argument("path", type=Path, help="Path to the indexed file to search")
-    p_sf.add_argument("-n", "--limit", type=int, default=10, help="Max results")
+    p_sf.add_argument("-n", "--limit", type=int, default=25, help="Max results")
     p_sf.add_argument(
         "-f",
         "--format",

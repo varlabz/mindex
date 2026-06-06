@@ -24,7 +24,9 @@ def _escape_fts5(query: str) -> str:
     return f'"{escaped}"'
 
 
-def search(index_dir: Path, query: str, file_path: str | None, limit: int) -> list[SearchResult]:
+def search(
+    index_dir: Path, query: str, file_path: list[str] | None, limit: int
+) -> list[SearchResult]:
     """Search using FTS5, optionally filtering by file_path (wildcard format) field."""
     stripped = query.strip()
     if not stripped:
@@ -48,8 +50,11 @@ def search(index_dir: Path, query: str, file_path: str | None, limit: int) -> li
         params: list = [fts_query]
 
         if file_path:
-            sql += " AND path GLOB ? "
-            params.append(file_path)
+            clauses = []
+            for fp in file_path:
+                clauses.append("path GLOB ?")
+                params.append(fp)
+            sql += " AND (" + " OR ".join(clauses) + ")"
 
         sql += " ORDER BY bm25(docs_fts) "
         sql += " LIMIT ? "

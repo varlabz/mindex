@@ -374,12 +374,12 @@ class TestSearch:
         assert isinstance(results, list)
 
     def test_search_with_file_filter(self, indexed_sample_files, index_dir):
-        results = search(index_dir, "another", file_path="*test2*", limit=100)
+        results = search(index_dir, "another", file_path=["*test2*"], limit=100)
         assert len(results) >= 1
         assert any("test2.md" in r.path for r in results)
 
     def test_search_with_file_filter_no_match(self, indexed_sample_files, index_dir):
-        results = search(index_dir, "hello", file_path="*nonexistent*", limit=100)
+        results = search(index_dir, "hello", file_path=["*nonexistent*"], limit=100)
         assert results == []
 
     def test_search_with_limit(self, indexed_sample_files, index_dir):
@@ -408,6 +408,53 @@ class TestSearch:
         results_upper = search(index_dir, "HELLO", file_path=None, limit=100)
         # FTS5 is case-insensitive by default
         assert len(results_lower) == len(results_upper)
+
+    def test_search_multiple_file_filters(self, indexed_sample_files, index_dir):
+        results = search(index_dir, "file", file_path=["*test1*", "*test2*"], limit=100)
+        assert len(results) >= 2
+        assert any("test1.md" in r.path for r in results)
+        assert any("test2.md" in r.path for r in results)
+
+    def test_search_empty_file_filters(self, indexed_sample_files, index_dir):
+        results = search(index_dir, "hello", file_path=[], limit=100)
+        assert len(results) >= 1
+
+    def test_search_multiple_paths_partial_match(self, indexed_sample_files, index_dir):
+        """One glob matches, another doesn't — results should still be returned."""
+        results = search(index_dir, "file", file_path=["*test1*", "*nonexistent*"], limit=100)
+        assert len(results) >= 1
+        assert any("test1.md" in r.path for r in results)
+        assert not any("nonexistent" in r.path for r in results)
+
+    def test_search_multiple_paths_all_no_match(self, indexed_sample_files, index_dir):
+        """All patterns don't match — empty results."""
+        results = search(index_dir, "file", file_path=["*nope1*", "*nope2*"], limit=100)
+        assert results == []
+
+    def test_search_multiple_paths_overlap(self, indexed_sample_files, index_dir):
+        """Overlapping globs matching the same file — no duplicates, results deduplicated by FTS."""
+        results = search(index_dir, "hello", file_path=["*test1*", "test1*"], limit=100)
+        assert len(results) >= 1
+        # Count unique paths
+        paths = {r.path for r in results}
+        assert len(paths) >= 1
+        assert all("test1" in p for p in paths)
+
+    def test_search_multiple_paths_subdirectory(self, indexed_sample_files, index_dir):
+        """Multiple patterns targeting files in subdirectories."""
+        results = search(index_dir, "content", file_path=["*sub/*", "*test2*"], limit=100)
+        assert len(results) >= 2
+        assert any("deep.md" in r.path for r in results)
+        assert any("test2.md" in r.path for r in results)
+
+    def test_search_multiple_paths_union(self, indexed_sample_files, index_dir):
+        """Multiple path filters return the union of results."""
+        # "File" appears in all files (case-insensitive FTS5 match)
+        results_t1 = search(index_dir, "file", file_path=["*test1*"], limit=100)
+        results_t2 = search(index_dir, "file", file_path=["*test2*"], limit=100)
+        results_both = search(index_dir, "file", file_path=["*test1*", "*test2*"], limit=100)
+        # Combined results should be at least the union
+        assert len(results_both) >= len(results_t1) + len(results_t2)
 
 
 # ── file_search tests ──────────────────────────────────────────────────

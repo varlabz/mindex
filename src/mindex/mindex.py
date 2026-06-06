@@ -82,7 +82,7 @@ def main(argv: list[str] | None = None) -> None:
     p_search = sub.add_parser("search", help="Search indexed files via FTS5")
     p_search.add_argument("query", help="Full-text search query (minimum 3 characters)")
     p_search.add_argument(
-        "path", nargs="?", default=None, help="Filter by file path (wildcard, e.g. '*.md')"
+        "paths", nargs="*", default=[], help="Filter by file path(s) (wildcard, e.g. '*.md')"
     )
     p_search.add_argument("-n", "--limit", type=int, default=10, help="Max results")
     p_search.add_argument(
@@ -153,8 +153,8 @@ def main(argv: list[str] | None = None) -> None:
         print_info(results, args.format)
 
     elif args.command == "search":
-        path = str(Path(args.path).expanduser()) if args.path else None
-        results = search(index_dir, args.query, file_path=path, limit=args.limit)
+        paths = [str(Path(p).expanduser()) for p in args.paths] if args.paths else None
+        results = search(index_dir, args.query, file_path=paths, limit=args.limit)
         print_search_results(results, args.format)
 
     elif args.command == "fsearch":

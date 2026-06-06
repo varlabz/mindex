@@ -215,9 +215,9 @@ Examples:
     elif args.command == "rm":
         paths = [str(Path(p).expanduser()) for p in args.paths]
         count = del_file(index_dir, paths)
-        print(
-            f"Removed: {len(paths)} path{'s' if len(paths) != 1 else ''} ({count} record{'s' if count != 1 else ''})"
-        )
+        path_label = f"path{'s' if len(paths) != 1 else ''}"
+        record_label = f"record{'s' if count != 1 else ''}"
+        print(f"Removed: {len(paths)} {path_label} ({count} {record_label})")
 
     elif args.command == "ls" or args.command == "list":
         paths = [str(Path(p).expanduser()) for p in args.paths] if args.paths else None

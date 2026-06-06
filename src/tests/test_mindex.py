@@ -400,15 +400,15 @@ class TestInfoByFile:
 class TestReadFile:
     def test_read_full_file(self, indexed_sample_files, index_dir):
         content = read_file(index_dir, str(indexed_sample_files["test1.md"]), start=0, size=4000)
-        assert "Hello World" in content
+        assert "Hello World" in content.content
 
     def test_read_with_offset(self, indexed_sample_files, index_dir):
         content = read_file(index_dir, str(indexed_sample_files["test1.md"]), start=10, size=100)
-        assert "Hello World" not in content[:10]  # content starts after offset
+        assert "Hello World" not in content.content[:10]  # content starts after offset
 
     def test_read_with_size_limit(self, indexed_sample_files, index_dir):
         content = read_file(index_dir, str(indexed_sample_files["test1.md"]), start=0, size=10)
-        assert len(content) == 10
+        assert len(content.content) == 10
 
     def test_read_nonexistent_file_raises(self, index_dir):
         with pytest.raises(FileNotFoundError, match="File not indexed"):
@@ -416,22 +416,22 @@ class TestReadFile:
 
     def test_read_with_zero_size(self, indexed_sample_files, index_dir):
         content = read_file(index_dir, str(indexed_sample_files["test1.md"]), start=0, size=0)
-        assert content == ""
+        assert content.content == ""
 
     def test_read_past_end(self, indexed_sample_files, index_dir):
         content = read_file(index_dir, str(indexed_sample_files["test1.md"]), start=0, size=999999)
         # Should return the full content without error
-        assert len(content) > 0
+        assert len(content.content) > 0
 
     def test_read_negative_start(self, indexed_sample_files, index_dir):
         # Python slicing handles negative indices, but let's verify it doesn't crash
         content = read_file(index_dir, str(indexed_sample_files["test1.md"]), start=-10, size=100)
         # Negative start means from the end, so this should work
-        assert len(content) > 0
+        assert len(content.content) > 0
 
     def test_read_with_none_size(self, indexed_sample_files, index_dir):
         content = read_file(index_dir, str(indexed_sample_files["test1.md"]), start=0, size=None)
-        assert "Hello World" in content
+        assert "Hello World" in content.content
 
 
 # ── search tests ───────────────────────────────────────────────────────
@@ -738,7 +738,7 @@ class TestIntegration:
 
         # Read a file
         content = read_file(index_dir, str(index_dir / "doc0.md"), start=0, size=100)
-        assert "Document 0" in content
+        assert "Document 0" in content.content
 
         # File search
         fs_results = file_search(index_dir, str(index_dir / "doc0.md"), "document")
@@ -766,7 +766,7 @@ class TestIntegration:
         assert len(results) >= 1
 
         content = read_file(index_dir, str(p), start=0, size=100)
-        assert "世界" in content
+        assert "世界" in content.content
 
     def test_large_content(self, index_dir):
         p = index_dir / "large.md"
@@ -778,7 +778,7 @@ class TestIntegration:
         assert len(results) >= 1
 
         content = read_file(index_dir, str(p), start=0, size=100)
-        assert "Line 0" in content
+        assert "Line 0" in content.content
 
     def test_unicode_search(self, index_dir):
         p = index_dir / "cjk.md"
@@ -790,7 +790,7 @@ class TestIntegration:
         # Using a non-phrase search (without quotes) with a prefix should work.
         # For now, verify the file is indexed and searchable via read
         content = read_file(index_dir, str(p), start=0, size=100)
-        assert "日本語" in content
+        assert "日本語" in content.content
 
     def test_long_path(self, index_dir):
         # Create deeply nested path

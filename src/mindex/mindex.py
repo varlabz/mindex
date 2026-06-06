@@ -108,13 +108,6 @@ Examples:
         nargs="+",
         help='File path(s) or glob pattern(s) to remove from the index (e.g., "~/*.md")',
     )
-    p_del.add_argument(
-        "-f",
-        "--format",
-        choices=["json", "text"],
-        default="json",
-        help="Output format (default: json)",
-    )
 
     # ls / list
     p_info = sub.add_parser("ls", aliases=["list"], help="List indexed files")
@@ -123,13 +116,6 @@ Examples:
         nargs="*",
         default=[],
         help='File path(s) or glob pattern(s) to filter indexed files (e.g., "~/*.md")',
-    )
-    p_info.add_argument(
-        "-f",
-        "--format",
-        choices=["json", "text"],
-        default="json",
-        help="Output format (default: json)",
     )
 
     # read
@@ -149,13 +135,6 @@ Examples:
         default=4000,
         help="Number of characters to read of the chunk (default: 4000)",
     )
-    p_read.add_argument(
-        "-f",
-        "--format",
-        choices=["json", "text"],
-        default="text",
-        help="Output format (default: text)",
-    )
 
     # search
     p_search = sub.add_parser("search", help="Search indexed files via FTS5")
@@ -164,26 +143,12 @@ Examples:
         "paths", nargs="*", default=[], help="Filter by file path(s) (wildcard, e.g. '*.md')"
     )
     p_search.add_argument("-n", "--limit", type=int, default=25, help="Max results")
-    p_search.add_argument(
-        "-f",
-        "--format",
-        choices=["json", "text"],
-        default="json",
-        help="Output format (default: json)",
-    )
 
     # file search
     p_sf = sub.add_parser("fsearch", help="Search within an indexed file")
     p_sf.add_argument("query", help="Search query")
     p_sf.add_argument("path", type=Path, help="Path to the indexed file to search")
     p_sf.add_argument("-n", "--limit", type=int, default=25, help="Max results")
-    p_sf.add_argument(
-        "-f",
-        "--format",
-        choices=["json", "text"],
-        default="json",
-        help="Output format (default: json)",
-    )
 
     # lint
     p_lint = sub.add_parser(
@@ -196,13 +161,16 @@ Examples:
         default=[],
         help='Optional path or wildcard pattern(s) to filter files (e.g., "*.md" "sub/*")',
     )
-    p_lint.add_argument(
-        "-f",
-        "--format",
-        choices=["json", "text"],
-        default="json",
-        help="Output format (default: json)",
-    )
+
+    # Add --format to ALL subcommands in one place
+    for p in (p_add, p_del, p_info, p_read, p_search, p_sf, p_lint):
+        p.add_argument(
+            "-f",
+            "--format",
+            choices=["json", "text"],
+            default="json",
+            help="Output format (default: json)",
+        )
 
     args = parser.parse_args(argv)
 
@@ -217,7 +185,10 @@ Examples:
     if args.command == "add":
         paths = [str(Path(p).expanduser()) for p in args.paths]
         count = add_file(index_dir, paths)
-        print(f"Indexed: {count} record{'s' if count != 1 else ''}")
+        if args.format == "json":
+            print(json.dumps({"indexed": count, "paths": paths}, indent=2))
+        else:
+            print(f"Indexed: {count} record{'s' if count != 1 else ''}")
 
     elif args.command == "rm":
         paths = [str(Path(p).expanduser()) for p in args.paths]

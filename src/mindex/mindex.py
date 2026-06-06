@@ -236,9 +236,8 @@ Examples:
 
     elif args.command == "read":
         path = str(args.path.expanduser().absolute())
-        content = read_file(index_dir, path, start=args.position, size=args.size)
-        results = [ReadResult(content=content, path=path)]
-        print_results(results, args.format)
+        results = read_file(index_dir, path, start=args.position, size=args.size)
+        print_results([results], args.format)
 
     elif args.command == "lint":
         paths = [str(Path(p).expanduser()) for p in args.paths] if args.paths else None

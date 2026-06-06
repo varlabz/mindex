@@ -1,11 +1,19 @@
 """Read command: retrieve stored file content from the index."""
 
+from dataclasses import dataclass
 from pathlib import Path
 
 from mindex.db import _db
 
 
-def read_file(index_dir: Path, file_path: str, start: int, size: int) -> str:
+@dataclass
+class ReadResult:
+    content: str
+    position: int
+    size: int
+
+
+def read_file(index_dir: Path, file_path: str, start: int, size: int) -> ReadResult:
     """Read file content from the index with optional pagination.
 
     Args:
@@ -31,4 +39,5 @@ def read_file(index_dir: Path, file_path: str, start: int, size: int) -> str:
 
         content = row["content"]
         end = start + size if size is not None else None
-        return content[start:end]
+        cnt = content[start:end]
+        return ReadResult(cnt, start, len(content))

@@ -1,7 +1,6 @@
 """Lint command: check indexed files for existence."""
 
-import json
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from pathlib import Path
 
 from mindex.db import _db
@@ -47,21 +46,3 @@ def lint(index_dir: Path, file_path: list[str] | None = None) -> list[LintInfo]:
     return results
 
 
-def lint_output(results: list[LintInfo], fmt: str) -> None:
-    """Print lint results in the specified format.
-
-    Args:
-        results: List of LintInfo records.
-        fmt: Output format ('json' or 'text').
-    """
-    if not results:
-        print("No indexed files.")
-        return
-    if fmt == "json":
-        print(json.dumps([asdict(r) for r in results], indent=2))
-    else:
-        for r in results:
-            print("-" * 20)
-            for k, v in asdict(r).items():
-                print(f"{k}: {v or '-'}")
-            print()

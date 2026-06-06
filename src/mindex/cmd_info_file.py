@@ -1,7 +1,6 @@
 """Info command: show metadata about indexed files."""
 
-import json
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from pathlib import Path
 
 from mindex.db import _db
@@ -42,25 +41,3 @@ def info_by_file(index_dir: Path, file_path: list[str] | None) -> list[FileInfo]
         return result
 
 
-def print_info(results: list[FileInfo], fmt: str) -> None:
-    """Print a list of FileInfo records in the given format.
-
-    Args:
-        results: List of FileInfo records to print.
-        fmt: Output format — "json" or "text" (default: "json").
-        tag: Optional tag label to include in the empty-result message.
-    """
-    if not results:
-        if fmt == "json":
-            print("[]")
-        else:
-            print("No records found.")
-        return
-    if fmt == "json":
-        print(json.dumps([asdict(r) for r in results], indent=2))
-    else:
-        for r in results:
-            print("-" * 20)
-            for k, v in asdict(r).items():
-                print(f"{k}: {v or '-'}")
-            print()

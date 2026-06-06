@@ -1,7 +1,6 @@
 """File-level search: FTS5 highlight-based search within a single indexed file."""
 
-import json
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from pathlib import Path
 
 from mindex.db import _db
@@ -45,28 +44,6 @@ def _extract_snippets(highlighted: str, limit: int) -> list[FileSearchResult]:
         search_start = term_end
 
     return results
-
-
-def print_file_search_results(results: list[FileSearchResult], fmt: str) -> None:
-    """Print a list of FileSearchResult records in the given format.
-
-    Args:
-        results: List of FileSearchResult records to print.
-        fmt: Output format - "json" or "text" (default: "json").
-    """
-    if not results:
-        if fmt == "json":
-            print("[]")
-        else:
-            print("No results.")
-        return
-    if fmt == "json":
-        print(json.dumps([asdict(r) for r in results], indent=2))
-    else:
-        for r in results:
-            print("-" * 20)
-            for k, v in asdict(r).items():
-                print(f"{k}: {v or '-'}")
 
 
 def file_search(

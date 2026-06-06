@@ -1,13 +1,15 @@
 import argparse
+import json
+from dataclasses import asdict
 from pathlib import Path
 
 from mindex.cmd_add_file import add_file
 from mindex.cmd_del_file import del_file
-from mindex.cmd_file_search import file_search, print_file_search_results
-from mindex.cmd_info_file import info_by_file, print_info
-from mindex.cmd_lint import lint, lint_output
+from mindex.cmd_file_search import file_search
+from mindex.cmd_info_file import info_by_file
+from mindex.cmd_lint import lint
 from mindex.cmd_read_file import read_file
-from mindex.cmd_search import print_search_results, search
+from mindex.cmd_search import search
 from mindex.db import DB_FILE
 
 # ── CLI ────────────────────────────────────────────────────────────────
@@ -206,17 +208,17 @@ Examples:
     elif args.command == "ls" or args.command == "list":
         paths = [str(Path(p).expanduser()) for p in args.paths] if args.paths else None
         results = info_by_file(index_dir, paths)
-        print_info(results, args.format)
+        print_results(results, args.format)
 
     elif args.command == "search":
         paths = [str(Path(p).expanduser()) for p in args.paths] if args.paths else None
         results = search(index_dir, args.query, file_path=paths, limit=args.limit)
-        print_search_results(results, args.format)
+        print_results(results, args.format)
 
     elif args.command == "fsearch":
         path = str(args.path.expanduser().absolute())
         results = file_search(index_dir, path, args.query, limit=args.limit)
-        print_file_search_results(results, args.format)
+        print_results(results, args.format)
 
     elif args.command == "read":
         path = str(args.path.expanduser().absolute())
@@ -226,7 +228,25 @@ Examples:
     elif args.command == "lint":
         paths = [str(Path(p).expanduser()) for p in args.paths] if args.paths else None
         results = lint(index_dir, paths)
-        lint_output(results, args.format)
+        print_results(results, args.format)
+
+
+def print_results(results: list, fmt: str) -> None:
+    """Print a list of records in the given format."""
+    if not results:
+        if fmt == "json":
+            print("[]")
+        else:
+            print("No records found.")
+        return
+    if fmt == "json":
+        print(json.dumps([asdict(r) for r in results], indent=2))
+    else:
+        for r in results:
+            print("-" * 40)
+            for k, v in asdict(r).items():
+                print(f"{k}: {v or '-'}")
+            print()
 
 
 if __name__ == "__main__":

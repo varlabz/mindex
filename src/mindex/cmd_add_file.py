@@ -35,8 +35,11 @@ def add_file(index_dir: Path, file_path: list[str]) -> int:
             if not fp.is_file() or fp.name.startswith("."):
                 continue
 
-            # check hash to avoid re-indexing
             content = fp.read_text(encoding="utf-8")
+            if len(content) == 0:
+                continue
+
+            # check hash to avoid re-indexing
             file_hash = hashlib.sha256(content.encode()).hexdigest()
             before = conn.total_changes
             conn.execute(

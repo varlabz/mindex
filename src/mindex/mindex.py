@@ -17,6 +17,7 @@ def main(argv: list[str] | None = None) -> None:
     """Command-line interface for mindex operations."""
     parser = argparse.ArgumentParser(
         prog="mindex",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
         description="""SQLite FTS5-based search index.
 
 FTS5 Query Syntax:

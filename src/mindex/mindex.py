@@ -184,11 +184,8 @@ Examples:
 
     if args.command == "add":
         paths = [str(Path(p).expanduser()) for p in args.paths]
-        count = add_file(index_dir, paths)
-        if args.format == "json":
-            print(json.dumps({"indexed": count, "paths": paths}, indent=2))
-        else:
-            print(f"Indexed: {count} record{'s' if count != 1 else ''}")
+        results = add_file(index_dir, paths)
+        print_results(results, args.format)
 
     elif args.command == "rm":
         paths = [str(Path(p).expanduser()) for p in args.paths]

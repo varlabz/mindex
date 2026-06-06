@@ -63,16 +63,16 @@ def indexed_sample_files(sample_files, index_dir):
 class TestAddFile:
     def test_add_single_file(self, index_dir, sample_files):
         count = add_file(index_dir, [str(sample_files["test1.md"])])
-        assert count == 1
+        assert len(count) == 1
 
     def test_add_via_glob(self, index_dir, sample_files):
         count = add_file(index_dir, [str(index_dir / "*.md")])
         # Only top-level files match *.md (not sub/deep.md)
-        assert count == 2
+        assert len(count) == 2
 
     def test_add_nested_file(self, index_dir, sample_files):
         count = add_file(index_dir, [str(sample_files["sub/deep.md"])])
-        assert count == 1
+        assert len(count) == 1
 
     def test_add_nonexistent_file_raises(self, index_dir):
         with pytest.raises(FileNotFoundError, match="No files matched"):
@@ -87,19 +87,19 @@ class TestAddFile:
         # Modify file
         sample_files["test1.md"].write_text("# Updated\nNew content.\n", encoding="utf-8")
         count = add_file(index_dir, [str(sample_files["test1.md"])])
-        assert count == 1  # hash changed, so it's re-indexed
+        assert len(count) == 1  # hash changed, so it's re-indexed
 
     def test_add_no_hash_change_no_reindex(self, index_dir, sample_files):
         count1 = add_file(index_dir, [str(sample_files["test1.md"])])
         count2 = add_file(index_dir, [str(sample_files["test1.md"])])
-        assert count1 == 1
-        assert count2 == 0  # same content, no re-index
+        assert len(count1) == 1
+        assert len(count2) == 0  # same content, no re-index
 
     def test_add_special_chars_in_name(self, index_dir):
         p = index_dir / "file [with] (special).md"
         p.write_text("# Special\n", encoding="utf-8")
         count = add_file(index_dir, [str(p)])
-        assert count == 1
+        assert len(count) == 1
 
     def test_add_glob_no_match(self, index_dir):
         with pytest.raises(FileNotFoundError, match="No files matched"):
@@ -109,7 +109,7 @@ class TestAddFile:
         # glob.glob requires recursive=True for **, so "**/*.md" without it won't recurse
         # Test that add_file handles a glob that matches multiple files
         count = add_file(index_dir, [str(index_dir / "test*.md")])
-        assert count == 2  # test1.md and test2.md
+        assert len(count) == 2  # test1.md and test2.md
 
     def test_add_multiple_explicit_paths(self, index_dir, sample_files):
         """Add multiple explicit files via list of paths."""
@@ -121,7 +121,7 @@ class TestAddFile:
                 str(sample_files["sub/deep.md"]),
             ],
         )
-        assert count == 3
+        assert len(count) == 3
 
     def test_add_multiple_glob_patterns(self, index_dir, sample_files):
         """Add files via multiple glob patterns."""
@@ -132,7 +132,7 @@ class TestAddFile:
                 str(index_dir / "sub/*.md"),
             ],
         )
-        assert count == 3  # test1.md, test2.md, sub/deep.md
+        assert len(count) == 3  # test1.md, test2.md, sub/deep.md
 
     def test_add_mixed_glob_and_literal(self, index_dir, sample_files):
         """Mix of explicit path and glob pattern."""
@@ -143,7 +143,7 @@ class TestAddFile:
                 str(index_dir / "sub/*.md"),
             ],
         )
-        assert count == 2  # test1.md, sub/deep.md
+        assert len(count) == 2  # test1.md, sub/deep.md
 
     def test_add_multiple_deduplicates_overlap(self, index_dir, sample_files):
         """Overlapping patterns should not double-count files."""
@@ -155,7 +155,7 @@ class TestAddFile:
             ],
         )
         # *.md matches test1.md, test2.md; test*.md overlaps both
-        assert count == 2
+        assert len(count) == 2
 
     def test_add_multiple_partial_failure(self, index_dir, sample_files):
         """If *any* pattern fails to match, it should raise."""
@@ -182,7 +182,7 @@ class TestAddFile:
         p = index_dir / ".hidden.md"
         p.write_text("# Hidden\n", encoding="utf-8")
         count = add_file(index_dir, [str(p)])
-        assert count == 0
+        assert len(count) == 0
 
     def test_add_hidden_file_glob_is_skipped(self, index_dir):
         """Hidden files matched by a glob are silently skipped."""
@@ -192,14 +192,14 @@ class TestAddFile:
         (index_dir / ".hidden.md").write_text("# Hidden\n", encoding="utf-8")
         count = add_file(index_dir, [str(index_dir / "*.md")])
         # Only visible.md should be indexed
-        assert count == 1
+        assert len(count) == 1
 
     def test_add_hidden_file_does_not_raise(self, index_dir):
         """Passing only hidden files should not raise — they are just skipped."""
         p = index_dir / ".config"
         p.write_text("config\n", encoding="utf-8")
         count = add_file(index_dir, [str(p)])
-        assert count == 0
+        assert len(count) == 0
 
     def test_add_file_in_hidden_directory_is_indexed(self, index_dir):
         """A non-hidden file inside a .-prefixed directory should still be indexed."""
@@ -207,7 +207,7 @@ class TestAddFile:
         nested.parent.mkdir(parents=True, exist_ok=True)
         nested.write_text("# Settings\n", encoding="utf-8")
         count = add_file(index_dir, [str(nested)])
-        assert count == 1
+        assert len(count) == 1
 
     def test_add_glob_in_hidden_directory(self, index_dir):
         """Glob matching files inside a .-prefixed directory should index them."""
@@ -215,7 +215,7 @@ class TestAddFile:
         nested.parent.mkdir(parents=True, exist_ok=True)
         nested.write_text("# Settings\n", encoding="utf-8")
         count = add_file(index_dir, [str(index_dir / ".config" / "*.md")])
-        assert count == 1
+        assert len(count) == 1
 
     def test_add_only_hidden_files_via_glob(self, index_dir):
         """Glob matching only hidden files should not raise and return 0."""
@@ -223,7 +223,7 @@ class TestAddFile:
         p.write_text("# Hidden\n", encoding="utf-8")
         # glob with a dot prefix
         count = add_file(index_dir, [str(index_dir / ".hidden.md")])
-        assert count == 0
+        assert len(count) == 0
 
 
 # ── del_file tests ─────────────────────────────────────────────────────

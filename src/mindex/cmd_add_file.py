@@ -2,12 +2,19 @@
 
 import glob
 import hashlib
+from dataclasses import dataclass
 from pathlib import Path
 
 from mindex.db import _db
 
 
-def add_file(index_dir: Path, file_path: list[str]) -> int:
+@dataclass
+class AddResult:
+    path: str
+    size: int
+
+
+def add_file(index_dir: Path, file_path: list[str]) -> list[AddResult]:
     """Add or update file(s) in the index.
 
     Each item in *file_path* is treated as a glob/wildcard pattern, so each can
@@ -28,8 +35,8 @@ def add_file(index_dir: Path, file_path: list[str]) -> int:
 
         matched.update(hits)
 
-    count = 0
     with _db(index_dir) as conn:
+        results: list[AddResult] = []
         for fp in map(Path, matched):
             # skip hidden files (e.g., .git, .venv)
             if not fp.is_file() or fp.name.startswith("."):
@@ -56,8 +63,7 @@ def add_file(index_dir: Path, file_path: list[str]) -> int:
                 (str(fp.absolute()), content, len(content), file_hash, file_hash),
             )
             if conn.total_changes > before:
-                count += 1
+                results.append(AddResult(path=str(fp.absolute()), size=len(content)))
 
         conn.commit()
-
-    return count
+        return results

@@ -231,18 +231,18 @@ class TestAddFile:
 
 class TestDelFile:
     def test_del_existing_file(self, indexed_sample_files, index_dir):
-        count = del_file(index_dir, [str(indexed_sample_files["test1.md"])])
-        assert count == 1
+        result = del_file(index_dir, [str(indexed_sample_files["test1.md"])])
+        assert len(result.paths) == 1
 
     def test_del_nonexistent_file(self, index_dir):
-        count = del_file(index_dir, ["/nonexistent/file.md"])
-        assert count == 0
+        result = del_file(index_dir, ["/nonexistent/file.md"])
+        assert len(result.paths) == 0
 
     def test_del_via_glob(self, indexed_sample_files, index_dir):
         # SQL GLOB treats * as matching any characters (including /)
         # so *.md matches test1.md, test2.md, AND sub/deep.md
-        count = del_file(index_dir, [str(index_dir / "*.md")])
-        assert count == 3  # SQL GLOB * matches / in paths
+        result = del_file(index_dir, [str(index_dir / "*.md")])
+        assert len(result.paths) == 3  # SQL GLOB * matches / in paths
 
     def test_del_removes_from_search(self, indexed_sample_files, index_dir):
         add_file(index_dir, [str(indexed_sample_files["test1.md"])])
@@ -251,19 +251,19 @@ class TestDelFile:
         assert all("test1.md" not in r.path for r in results)
 
     def test_del_glob_no_match(self, index_dir):
-        count = del_file(index_dir, ["/nonexistent/*.md"])
-        assert count == 0
+        result = del_file(index_dir, ["/nonexistent/*.md"])
+        assert len(result.paths) == 0
 
     def test_del_multiple_specific_files(self, indexed_sample_files, index_dir):
         """Delete multiple specific files in one call."""
-        count = del_file(
+        result = del_file(
             index_dir,
             [
                 str(indexed_sample_files["test1.md"]),
                 str(indexed_sample_files["test2.md"]),
             ],
         )
-        assert count == 2
+        assert len(result.paths) == 2
 
         # Verify they're gone
         infos = info_by_file(index_dir, ["*"])
@@ -274,7 +274,7 @@ class TestDelFile:
 
     def test_del_multiple_mixed_existing_and_nonexistent(self, indexed_sample_files, index_dir):
         """Mix of existing and non-existing paths should still delete the existing ones."""
-        count = del_file(
+        result = del_file(
             index_dir,
             [
                 str(indexed_sample_files["test1.md"]),
@@ -282,7 +282,7 @@ class TestDelFile:
                 str(indexed_sample_files["test2.md"]),
             ],
         )
-        assert count == 2
+        assert len(result.paths) == 2
 
         infos = info_by_file(index_dir, ["*"])
         paths = [i.path for i in infos]
@@ -298,14 +298,14 @@ class TestDelFile:
         txt_file.write_text("extra", encoding="utf-8")
         add_file(index_dir, [str(txt_file)])
 
-        count = del_file(
+        result = del_file(
             index_dir,
             [
                 str(index_dir / "*.txt"),
                 str(index_dir / "sub" / "*.md"),
             ],
         )
-        assert count == 2  # extra.txt + sub/deep.md
+        assert len(result.paths) == 2  # extra.txt + sub/deep.md
 
         infos = info_by_file(index_dir, ["*"])
         paths = [i.path for i in infos]
@@ -315,9 +315,15 @@ class TestDelFile:
         assert any(p.endswith("test2.md") for p in paths)
 
     def test_del_empty_path_list(self, index_dir):
-        """Empty list should return 0 without error."""
-        count = del_file(index_dir, [])
-        assert count == 0
+        """Empty list should raise ValueError."""
+        with pytest.raises(ValueError, match="file_path must not be empty"):
+            del_file(index_dir, [])
+
+    def test_del_returns_correct_paths(self, indexed_sample_files, index_dir):
+        """Returned paths should match the deleted file paths."""
+        result = del_file(index_dir, [str(indexed_sample_files["test1.md"])])
+        assert len(result.paths) == 1
+        assert "test1.md" in result.paths[0]
 
 
 # ── info_by_file tests ─────────────────────────────────────────────────

@@ -108,6 +108,13 @@ Examples:
         nargs="+",
         help='File path(s) or glob pattern(s) to remove from the index (e.g., "~/*.md")',
     )
+    p_del.add_argument(
+        "-f",
+        "--format",
+        choices=["json", "text"],
+        default="json",
+        help="Output format (default: json)",
+    )
 
     # ls / list
     p_info = sub.add_parser("ls", aliases=["list"], help="List indexed files")
@@ -214,10 +221,8 @@ Examples:
 
     elif args.command == "rm":
         paths = [str(Path(p).expanduser()) for p in args.paths]
-        count = del_file(index_dir, paths)
-        path_label = f"path{'s' if len(paths) != 1 else ''}"
-        record_label = f"record{'s' if count != 1 else ''}"
-        print(f"Removed: {len(paths)} {path_label} ({count} {record_label})")
+        results = del_file(index_dir, paths)
+        print_results([results], args.format)
 
     elif args.command == "ls" or args.command == "list":
         paths = [str(Path(p).expanduser()) for p in args.paths] if args.paths else None

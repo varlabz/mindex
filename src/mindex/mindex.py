@@ -1,6 +1,6 @@
 import argparse
 import json
-from dataclasses import asdict
+from dataclasses import asdict, dataclass
 from pathlib import Path
 
 from mindex.cmd_add_file import add_file
@@ -11,6 +11,13 @@ from mindex.cmd_lint import lint
 from mindex.cmd_read_file import read_file
 from mindex.cmd_search import search
 from mindex.db import DB_FILE
+
+
+@dataclass
+class ReadResult:
+    content: str
+    path: str
+
 
 # ── CLI ────────────────────────────────────────────────────────────────
 
@@ -135,6 +142,13 @@ Examples:
         default=4000,
         help="Number of characters to read of the chunk (default: 4000)",
     )
+    p_read.add_argument(
+        "-f",
+        "--format",
+        choices=["json", "text"],
+        default="text",
+        help="Output format (default: text)",
+    )
 
     # search
     p_search = sub.add_parser("search", help="Search indexed files via FTS5")
@@ -223,7 +237,8 @@ Examples:
     elif args.command == "read":
         path = str(args.path.expanduser().absolute())
         content = read_file(index_dir, path, start=args.position, size=args.size)
-        print(content)
+        results = [ReadResult(content=content, path=path)]
+        print_results(results, args.format)
 
     elif args.command == "lint":
         paths = [str(Path(p).expanduser()) for p in args.paths] if args.paths else None

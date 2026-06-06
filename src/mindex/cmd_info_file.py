@@ -27,17 +27,10 @@ def info_by_file(index_dir: Path, file_path: list[str] | None) -> list[FileInfo]
     """
     with _db(index_dir) as conn:
         sql = "SELECT path, size, updated_at FROM docs"
-        params: list = []
-
+        params: list[str] = []
         if file_path:
-            clauses = []
-            for fp in file_path:
-                clauses.append("path GLOB ?")
-                params.append(fp)
+            clauses = ["path GLOB ?"] * len(file_path)
+            params.extend(file_path)
             sql += " WHERE " + " OR ".join(clauses)
 
-        rows = conn.execute(sql, params).fetchall()
-        result = [FileInfo(**row) for row in rows]
-        return result
-
-
+        return [FileInfo(**row) for row in conn.execute(sql, params).fetchall()]

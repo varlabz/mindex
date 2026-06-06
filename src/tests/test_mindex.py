@@ -181,27 +181,92 @@ class TestAddFile:
 
 class TestDelFile:
     def test_del_existing_file(self, indexed_sample_files, index_dir):
-        count = del_file(index_dir, str(indexed_sample_files["test1.md"]))
+        count = del_file(index_dir, [str(indexed_sample_files["test1.md"])])
         assert count == 1
 
     def test_del_nonexistent_file(self, index_dir):
-        count = del_file(index_dir, "/nonexistent/file.md")
+        count = del_file(index_dir, ["/nonexistent/file.md"])
         assert count == 0
 
     def test_del_via_glob(self, indexed_sample_files, index_dir):
         # SQL GLOB treats * as matching any characters (including /)
         # so *.md matches test1.md, test2.md, AND sub/deep.md
-        count = del_file(index_dir, str(index_dir / "*.md"))
+        count = del_file(index_dir, [str(index_dir / "*.md")])
         assert count == 3  # SQL GLOB * matches / in paths
 
     def test_del_removes_from_search(self, indexed_sample_files, index_dir):
         add_file(index_dir, [str(indexed_sample_files["test1.md"])])
-        del_file(index_dir, str(indexed_sample_files["test1.md"]))
+        del_file(index_dir, [str(indexed_sample_files["test1.md"])])
         results = search(index_dir, "hello", file_path=None, limit=100)
         assert all("test1.md" not in r.path for r in results)
 
     def test_del_glob_no_match(self, index_dir):
-        count = del_file(index_dir, "/nonexistent/*.md")
+        count = del_file(index_dir, ["/nonexistent/*.md"])
+        assert count == 0
+
+    def test_del_multiple_specific_files(self, indexed_sample_files, index_dir):
+        """Delete multiple specific files in one call."""
+        count = del_file(
+            index_dir,
+            [
+                str(indexed_sample_files["test1.md"]),
+                str(indexed_sample_files["test2.md"]),
+            ],
+        )
+        assert count == 2
+
+        # Verify they're gone
+        infos = info_by_file(index_dir, "*")
+        paths = [i.path for i in infos]
+        assert not any(p.endswith("test1.md") for p in paths)
+        assert not any(p.endswith("test2.md") for p in paths)
+        assert any(p.endswith("sub/deep.md") for p in paths)
+
+    def test_del_multiple_mixed_existing_and_nonexistent(self, indexed_sample_files, index_dir):
+        """Mix of existing and non-existing paths should still delete the existing ones."""
+        count = del_file(
+            index_dir,
+            [
+                str(indexed_sample_files["test1.md"]),
+                "/nonexistent/file.md",
+                str(indexed_sample_files["test2.md"]),
+            ],
+        )
+        assert count == 2
+
+        infos = info_by_file(index_dir, "*")
+        paths = [i.path for i in infos]
+        assert not any(p.endswith("test1.md") for p in paths)
+        assert not any(p.endswith("test2.md") for p in paths)
+        assert any(p.endswith("sub/deep.md") for p in paths)
+
+    def test_del_multiple_globs(self, indexed_sample_files, index_dir):
+        """Multiple glob patterns deleting different sets of files."""
+        # Remove .txt files and the sub/ file using separate globs
+        # First let's create a .txt file to delete
+        txt_file = index_dir / "extra.txt"
+        txt_file.write_text("extra", encoding="utf-8")
+        add_file(index_dir, [str(txt_file)])
+
+        count = del_file(
+            index_dir,
+            [
+                str(index_dir / "*.txt"),
+                str(index_dir / "sub" / "*.md"),
+            ],
+        )
+        assert count == 2  # extra.txt + sub/deep.md
+
+        infos = info_by_file(index_dir, "*")
+        paths = [i.path for i in infos]
+        assert not any(p.endswith("extra.txt") for p in paths)
+        assert not any(p.endswith("sub/deep.md") for p in paths)
+        assert any(p.endswith("test1.md") for p in paths)
+        assert any(p.endswith("test2.md") for p in paths)
+
+    def test_del_empty_path_list(self, index_dir):
+        """Empty list should return 0 without error."""
+        count = del_file(index_dir, [])
         assert count == 0
 
 
@@ -465,7 +530,7 @@ class TestIntegration:
         assert len(results) >= 1
 
         # Delete it
-        del_file(index_dir, str(p))
+        del_file(index_dir, [str(p)])
 
         # Search should no longer find it
         results = search(index_dir, "cycle", file_path=None, limit=100)
@@ -512,8 +577,7 @@ class TestIntegration:
         assert all(r.status == "OK" for r in lint_results)
 
         # Delete some files from index
-        del_file(index_dir, str(index_dir / "doc0.md"))
-        del_file(index_dir, str(index_dir / "doc1.md"))
+        del_file(index_dir, [str(index_dir / "doc0.md"), str(index_dir / "doc1.md")])
 
         # Re-lint should show only remaining files (doc2, doc3, doc4)
         lint_results = lint(index_dir)

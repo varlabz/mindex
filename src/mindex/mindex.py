@@ -35,9 +35,12 @@ def main(argv: list[str] | None = None) -> None:
     )
 
     # rm
-    p_del = sub.add_parser("rm", help="Remove a file from the index")
+    p_del = sub.add_parser("rm", help="Remove files from the index")
     p_del.add_argument(
-        "path", type=str, help='File path or glob pattern to remove from the index (e.g., "~/*.md")'
+        "paths",
+        type=str,
+        nargs="+",
+        help='File path(s) or glob pattern(s) to remove from the index (e.g., "~/*.md")',
     )
 
     # ls / list
@@ -138,9 +141,11 @@ def main(argv: list[str] | None = None) -> None:
         print(f"Indexed: {count} record{'s' if count != 1 else ''}")
 
     elif args.command == "rm":
-        path = str(Path(args.path).expanduser())
-        count = del_file(index_dir, path)
-        print(f"Removed: {args.path} ({count} record{'s' if count != 1 else ''})")
+        paths = [str(Path(p).expanduser()) for p in args.paths]
+        count = del_file(index_dir, paths)
+        print(
+            f"Removed: {len(paths)} path{'s' if len(paths) != 1 else ''} ({count} record{'s' if count != 1 else ''})"
+        )
 
     elif args.command == "ls" or args.command == "list":
         path = str(Path(args.path).expanduser())

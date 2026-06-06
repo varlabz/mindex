@@ -1,4 +1,4 @@
-"""Search command: FTS5-based search across indexed files."""
+"""Search command: FTS5-based search across indexed files with optional path filtering."""
 
 from dataclasses import dataclass
 from pathlib import Path
@@ -16,7 +16,25 @@ class SearchResult:
 def search(
     index_dir: Path, query: str, file_path: list[str] | None, limit: int
 ) -> list[SearchResult]:
-    """Search using FTS5, optionally filtering by file_path (wildcard format) field."""
+    """Search indexed files using FTS5 full-text search.
+
+    Runs an FTS5 MATCH query against the index, optionally restricting results
+    to files matching one or more glob-style path patterns. Results are ordered
+    by relevance (BM25).
+
+    Args:
+        index_dir: Path to the index directory containing the SQLite database.
+        query: FTS5 search query string. Must be at least 3 characters after stripping.
+        file_path: Optional list of glob patterns to filter by file path
+            (e.g. ["*.md", "docs/*"]). When None, searches all indexed files.
+        limit: Maximum number of search results to return.
+
+    Returns:
+        list[SearchResult] with matching file paths, content snippets, and timestamps.
+
+    Raises:
+        ValueError: If query is empty/whitespace or shorter than 3 characters.
+    """
     stripped = query.strip()
     if not stripped:
         raise ValueError("Query cannot be empty or whitespace only")
@@ -51,5 +69,3 @@ def search(
 
         rows = conn.execute(sql, params).fetchall()
         return [SearchResult(**row) for row in rows]
-
-

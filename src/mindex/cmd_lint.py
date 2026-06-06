@@ -13,16 +13,19 @@ class LintInfo:
 
 
 def lint(index_dir: Path, file_path: list[str] | None = None) -> list[LintInfo]:
-    """Lint indexed files: check if they exist on disk.
+    """Check whether indexed files still exist on disk.
+
+    Queries the index for all (or filtered) file paths and checks each one
+    against the filesystem. Returns a status of ``"OK"`` for files that exist
+    and ``"missing"`` for files that have been deleted or moved.
 
     Args:
-        index_dir: Path to the index directory.
-        file_path: Optional list of path or wildcard patterns to filter files by.
-            Supports glob-style wildcards (e.g. "*.md", "sub/*").
-            Only files matching at least one pattern are returned.
+        index_dir: Path to the index directory containing the SQLite database.
+        file_path: Optional list of glob-style wildcard patterns to filter which
+            indexed files are checked. If None, all indexed files are linted.
 
     Returns:
-        List of LintInfo records with 'path' and 'status'.
+        list[LintInfo] with ``path`` and ``status`` (``"OK"`` or ``"missing"``).
     """
     with _db(index_dir) as conn:
         sql = "SELECT path FROM docs"
@@ -44,5 +47,3 @@ def lint(index_dir: Path, file_path: list[str] | None = None) -> list[LintInfo]:
         results.append(LintInfo(path=str(fp), status=status))
 
     return results
-
-

@@ -14,16 +14,16 @@ class FileInfo:
 
 
 def info_by_file(index_dir: Path, file_path: list[str] | None) -> list[FileInfo]:
-    """Return basic info about indexed file(s).
+    """Return metadata about indexed file(s).
 
     Args:
-        index_dir: Path to the index directory.
-        file_path: Optional list of path or wildcard patterns to match indexed files.
-                   If None, returns all indexed files.
-                   Supports glob-style wildcards (e.g. "*.md", "docs/*").
+        index_dir: Path to the index directory containing the SQLite database.
+        file_path: Optional list of glob-style wildcard patterns to filter indexed files.
+            If None, returns info for all indexed files.
+            Examples: ``["*.md"]``, ``["docs/*", "src/*.py"]``.
 
     Returns:
-        list[FileInfo] of matching records.
+        list[FileInfo] with path, size, and last-updated timestamp for each match.
     """
     with _db(index_dir) as conn:
         sql = "SELECT path, size, updated_at FROM docs"

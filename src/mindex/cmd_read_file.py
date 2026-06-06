@@ -16,17 +16,20 @@ class ReadResult:
 def read_file(index_dir: Path, file_path: str, start: int, size: int) -> ReadResult:
     """Read file content from the index with optional pagination.
 
+    Retrieves stored content of an indexed file, optionally returning only a
+    character slice defined by *start* and *size*.
+
     Args:
-        index_dir: Path to the index directory.
-        file_path: Path to the indexed file.
-        start: Starting character offset (default: 0).
-        size: Number of characters to read. None means read entire file.
+        index_dir: Path to the index directory containing the SQLite database.
+        file_path: Exact path of the indexed file to read.
+        start: Starting character offset (0-based).
+        size: Number of characters to read. Pass ``0`` to read the entire file.
 
     Returns:
-        The file content as a string.
+        ReadResult containing the content slice, the start offset, and total file size.
 
     Raises:
-        FileNotFoundError: If the file is not found in the index.
+        FileNotFoundError: If *file_path* is not found in the index.
     """
     with _db(index_dir) as conn:
         row = conn.execute(

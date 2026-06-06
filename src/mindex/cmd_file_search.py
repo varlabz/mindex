@@ -49,11 +49,21 @@ def _extract_snippets(highlighted: str, limit: int) -> list[FileSearchResult]:
 def file_search(
     index_dir: Path, file_path: str, query: str, limit: int = 10
 ) -> list[FileSearchResult]:
-    """Search within a specific file and return multiple matching snippets.
+    """Search within a single indexed file using FTS5 and return matching snippets.
 
-    Uses FTS5's highlight() to wrap matched terms with custom markers.
-    Extracts context windows by scanning for markers in the highlighted text,
-    avoiding byte-offset mismatches caused by marker insertion.
+    Runs an FTS5 MATCH query restricted to one specific file path. Uses FTS5's
+    ``highlight()`` function to locate matches, then extracts context windows
+    around each match separated by custom markers to avoid byte-offset mismatches.
+
+    Args:
+        index_dir: Path to the index directory containing the SQLite database.
+        file_path: Exact path of the indexed file to search within.
+        query: FTS5 search query string.
+        limit: Maximum number of snippets to return (default: 10).
+
+    Returns:
+        list[FileSearchResult] with snippet text and character position for each match.
+        Returns an empty list if no matches are found.
     """
     with _db(index_dir) as conn:
         row = conn.execute(

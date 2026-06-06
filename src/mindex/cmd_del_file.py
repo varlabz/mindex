@@ -12,7 +12,22 @@ class DelResult:
 
 
 def del_file(index_dir: Path, file_path: list[str]) -> DelResult:
-    """Remove files from the index by file path(s) or glob pattern(s)."""
+    """Remove files from the FTS5 search index.
+
+    Deletes indexed files whose paths match one or more glob-style patterns.
+    Only paths that match at least one pattern are removed.
+
+    Args:
+        index_dir: Path to the index directory containing the SQLite database.
+        file_path: One or more glob/wildcard patterns identifying files to remove.
+            Must not be empty.
+
+    Returns:
+        DelResult containing the list of paths that were actually deleted.
+
+    Raises:
+        ValueError: If *file_path* is empty.
+    """
     if not file_path:
         raise ValueError("file_path must not be empty")
 

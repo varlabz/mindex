@@ -14,16 +14,6 @@ class SearchResult:
     updated_at: str
 
 
-def _escape_fts5(query: str) -> str:
-    """Escape a user query for safe use as a literal FTS5 phrase match.
-
-    Wraps the query in double quotes so FTS5 treats it as a literal phrase.
-    Embedded double quotes are escaped by doubling ("").
-    """
-    escaped = query.replace('"', '""')
-    return f'"{escaped}"'
-
-
 def search(
     index_dir: Path, query: str, file_path: list[str] | None, limit: int
 ) -> list[SearchResult]:
@@ -46,7 +36,7 @@ def search(
             JOIN docs d ON docs_fts.rowid = d.id
             WHERE docs_fts MATCH ?
         """
-        fts_query = _escape_fts5(stripped)
+        fts_query = query
         params: list = [fts_query]
 
         if file_path:

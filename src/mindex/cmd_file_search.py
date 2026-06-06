@@ -4,7 +4,6 @@ import json
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
-from mindex.cmd_search import _escape_fts5
 from mindex.db import _db
 
 
@@ -79,7 +78,6 @@ def file_search(
     Extracts context windows by scanning for markers in the highlighted text,
     avoiding byte-offset mismatches caused by marker insertion.
     """
-    fts_query = _escape_fts5(query)
     with _db(index_dir) as conn:
         row = conn.execute(
             f"""SELECT highlight(docs_fts, 0, '{MARK_START}', '{MARK_END}') AS h
@@ -88,7 +86,7 @@ def file_search(
             WHERE docs_fts MATCH ? AND d.path = ?
             """,
             (
-                fts_query,
+                query,
                 file_path,
             ),
         ).fetchone()

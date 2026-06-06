@@ -17,7 +17,63 @@ def main(argv: list[str] | None = None) -> None:
     """Command-line interface for mindex operations."""
     parser = argparse.ArgumentParser(
         prog="mindex",
-        description="SQLite FTS5-based search index",
+        description="""SQLite FTS5-based search index.
+
+FTS5 Query Syntax:
+  FTS5 uses a full-text query language for powerful text search.
+
+  1. Simple queries:
+     mindex search "python"              # Find "python" in any word
+     mindex search "python" "*.py"       # Filter by file path pattern
+
+  2. Prefix queries (words starting with a prefix):
+     mindex search "pyth*"               # Matches: python, pytest, pythagorean
+
+  3. Phrase queries (exact phrase, word order preserved):
+     mindex search '"full text search"'  # Exact phrase match
+
+  4. Boolean operators:
+     mindex search 'python AND rust'     # Both terms must appear
+     mindex search 'python OR rust'      # Either term may appear
+     mindex search 'python NOT java'     # Must have python, must not have java
+     mindex search '(python OR rust) AND cli'
+
+  5. OR-group queries:
+     mindex search '(python rust) AND cli'
+
+  6. Column filters with paths:
+      mindex search 'python' '*.py'     # Search "python" in .py files only
+      mindex search '"async"' "*.rs"    # Search phrase in .rs files only
+
+Examples:
+  # Index files
+  mindex add "src/**/*.py"
+  mindex add "docs/*.md"
+
+  # Basic search
+  mindex search "async"
+  mindex search "async" "*.py" -n 10
+
+  # Phrase search
+  mindex search '"full text"'
+
+  # Boolean logic
+  mindex search 'python AND rust'
+  mindex search '(python OR rust) NOT go'
+
+  # Prefix search
+  mindex search 'pyth*'
+
+  # List indexed files
+  mindex ls
+  mindex ls "*.py" -f text
+
+  # Read a chunk of indexed content
+  mindex read "src/mindex/mindex.py" -s 2000
+
+  # File-specific search
+  mindex fsearch "async" "src/mindex/mindex.py"
+""",
     )
     parser.add_argument(
         "--index-dir",

@@ -95,6 +95,49 @@ mindex --index-dir <index_dir> search "transformer architecture" --format text
 mindex --index-dir <index_dir> search '"exact phrase match"'
 ```
 
+### FTS5 Query Syntax Variations
+
+mindex supports the full FTS5 query language for powerful text search:
+
+| Query Type | Syntax | Example |
+|------------|--------|---------|
+| **Simple** | Space-separated terms (AND) | `mindex search "python"` |
+| **Prefix** | Trailing `*` for word prefix | `mindex search "pyth*"` (matches python, pytest, pythagorean) |
+| **Phrase** | Double quotes for exact phrase | `mindex search '"full text search"'` |
+| **AND** | `AND` operator | `mindex search 'python AND rust'` |
+| **OR** | `OR` operator | `mindex search 'python OR rust'` |
+| **NOT** | `NOT` operator | `mindex search 'python NOT java'` |
+| **Grouped** | Parentheses for grouping | `mindex search '(python OR rust) AND cli'` |
+| **OR-group** | Space inside parens (implicit OR) | `mindex search '(python rust) AND cli'` |
+
+### Advanced Examples
+
+```bash
+# Prefix search — matches words starting with "pyth"
+mindex --index-dir <index_dir> search 'pyth*'
+
+# Boolean AND — both terms must appear
+mindex --index-dir <index_dir> search 'python AND rust'
+
+# Boolean OR — either term may appear
+mindex --index-dir <index_dir> search 'python OR rust'
+
+# Boolean NOT — must have python, must not have java
+mindex --index-dir <index_dir> search 'python NOT java'
+
+# Grouped complex query
+mindex --index-dir <index_dir> search '(python OR rust) AND cli'
+
+# OR-group (implicit OR via space in parens)
+mindex --index-dir <index_dir> search '(python rust) AND cli'
+
+# Combine with path filter
+mindex --index-dir <index_dir> search 'python' '*.py' -n 10
+
+# Phrase search with path filter
+mindex --index-dir <index_dir> search '"async"' "*.rs"
+```
+
 ---
 
 ## Search Inside a File (fsearch)
@@ -175,6 +218,8 @@ Useful for checking whether a file is indexed, listing files matching a glob pat
 
 ```bash
 mindex --index-dir <index_dir> list <file_or_glob> [options]
+# or use the `ls` alias
+mindex --index-dir <index_dir> ls <file_or_glob> [options]
 ```
 
 **Options:**

@@ -9,8 +9,8 @@ DB_FILE = "mindex.sqlite"  # index file stored in vault directory
 class _db:
     """Context-manager wrapper for sqlite3.Connection with auto-close."""
 
-    def __init__(self, index_dir: Path):
-        self.conn = self.get_db(index_dir)
+    def __init__(self, index_dir: Path, must_exist: bool = True):
+        self.conn = self.get_db(index_dir, must_exist)
 
     def __enter__(self) -> sqlite3.Connection:
         return self.conn
@@ -19,8 +19,12 @@ class _db:
         self.conn.close()
 
     @staticmethod
-    def get_db(index_dir: Path) -> sqlite3.Connection:
-        conn = sqlite3.connect(index_dir / DB_FILE)
+    def get_db(index_dir: Path, must_exist: bool = True) -> sqlite3.Connection:
+        db_file = index_dir / DB_FILE
+        if not db_file.exists() and must_exist:
+            raise FileNotFoundError(f"Index database not found: {db_file}. Add files first using 'mindex add'.")
+
+        conn = sqlite3.connect(db_file)
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA journal_mode=WAL")
         conn.execute("PRAGMA foreign_keys=ON")

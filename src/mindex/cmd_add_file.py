@@ -49,7 +49,7 @@ def add_file(index_dir: Path, file_path: list[str]) -> list[AddResult]:
 
         matched.update(hits)
 
-    with _db(index_dir) as conn:
+    with _db(index_dir, must_exist=False) as conn:
         results: list[AddResult] = []
         for fp in map(Path, matched):
             # skip hidden files (e.g., .git, .venv)

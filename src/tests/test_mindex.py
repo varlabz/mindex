@@ -34,6 +34,14 @@ def index_dir():
 
 
 @pytest.fixture
+def empty_db(index_dir):
+    """Create a temporary directory with an empty (but existing) mindex.sqlite."""
+    with _db(index_dir, must_exist=False):
+        pass
+    return index_dir
+
+
+@pytest.fixture
 def sample_files(index_dir):
     """Create sample markdown files for testing."""
     files = {}
@@ -234,8 +242,8 @@ class TestDelFile:
         result = del_file(index_dir, [str(indexed_sample_files["test1.md"])])
         assert len(result.paths) == 1
 
-    def test_del_nonexistent_file(self, index_dir):
-        result = del_file(index_dir, ["/nonexistent/file.md"])
+    def test_del_nonexistent_file(self, empty_db):
+        result = del_file(empty_db, ["/nonexistent/file.md"])
         assert len(result.paths) == 0
 
     def test_del_via_glob(self, indexed_sample_files, index_dir):
@@ -250,8 +258,8 @@ class TestDelFile:
         results = search(index_dir, "hello", file_path=None, limit=100)
         assert all("test1.md" not in r.path for r in results)
 
-    def test_del_glob_no_match(self, index_dir):
-        result = del_file(index_dir, ["/nonexistent/*.md"])
+    def test_del_glob_no_match(self, empty_db):
+        result = del_file(empty_db, ["/nonexistent/*.md"])
         assert len(result.paths) == 0
 
     def test_del_multiple_specific_files(self, indexed_sample_files, index_dir):
@@ -416,9 +424,9 @@ class TestReadFile:
         content = read_file(index_dir, str(indexed_sample_files["test1.md"]), start=0, size=10)
         assert len(content.content) == 10
 
-    def test_read_nonexistent_file_raises(self, index_dir):
+    def test_read_nonexistent_file_raises(self, empty_db):
         with pytest.raises(FileNotFoundError, match="File not indexed"):
-            read_file(index_dir, "/nonexistent/file.md", start=0, size=100)
+            read_file(empty_db, "/nonexistent/file.md", start=0, size=100)
 
     def test_read_with_zero_size(self, indexed_sample_files, index_dir):
         content = read_file(index_dir, str(indexed_sample_files["test1.md"]), start=0, size=0)
@@ -568,8 +576,8 @@ class TestFileSearch:
         results = file_search(index_dir, str(indexed_sample_files["test1.md"]), "zzzzzzzzzzzz")
         assert results == []
 
-    def test_file_search_nonexistent_file(self, index_dir):
-        results = file_search(index_dir, "/nonexistent/file.md", "hello")
+    def test_file_search_nonexistent_file(self, empty_db):
+        results = file_search(empty_db, "/nonexistent/file.md", "hello")
         assert results == []
 
     def test_file_search_with_limit(self, indexed_sample_files, index_dir):
@@ -631,8 +639,8 @@ class TestLint:
         assert len(results) == 3
         assert all(r.status == "OK" for r in results)
 
-    def test_lint_empty_index(self, index_dir):
-        results = lint(index_dir)
+    def test_lint_empty_index(self, empty_db):
+        results = lint(empty_db)
         assert results == []
 
     def test_lint_multiple_explicit_paths(self, indexed_sample_files, index_dir):
@@ -664,32 +672,123 @@ class TestLint:
         assert all(r.status == "OK" for r in results)
 
 
+# ── Missing database tests ────────────────────────────────────────────
+
+
+class TestMissingDatabase:
+    """Verify that all commands except 'add' require mindex.sqlite to exist."""
+
+    def test_search_raises_without_db(self, index_dir):
+        """search should raise FileNotFoundError when mindex.sqlite does not exist."""
+        with pytest.raises(FileNotFoundError, match="Index database not found"):
+            search(index_dir, "hello", file_path=None, limit=10)
+
+    def test_file_search_raises_without_db(self, index_dir):
+        """file_search should raise FileNotFoundError when mindex.sqlite does not exist."""
+        with pytest.raises(FileNotFoundError, match="Index database not found"):
+            file_search(index_dir, "/some/path.md", "hello")
+
+    def test_info_by_file_raises_without_db(self, index_dir):
+        """info_by_file should raise FileNotFoundError when mindex.sqlite does not exist."""
+        with pytest.raises(FileNotFoundError, match="Index database not found"):
+            info_by_file(index_dir, None)
+
+    def test_read_file_raises_without_db(self, index_dir):
+        """read_file should raise FileNotFoundError when mindex.sqlite does not exist."""
+        with pytest.raises(FileNotFoundError, match="Index database not found"):
+            read_file(index_dir, "/some/path.md", start=0, size=100)
+
+    def test_del_file_raises_without_db(self, index_dir):
+        """del_file should raise FileNotFoundError when mindex.sqlite does not exist."""
+        with pytest.raises(FileNotFoundError, match="Index database not found"):
+            del_file(index_dir, ["/some/path.md"])
+
+    def test_lint_raises_without_db(self, index_dir):
+        """lint should raise FileNotFoundError when mindex.sqlite does not exist."""
+        with pytest.raises(FileNotFoundError, match="Index database not found"):
+            lint(index_dir)
+
+    def test_add_works_without_db(self, index_dir):
+        """add_file should NOT raise when mindex.sqlite does not exist — it creates it."""
+        p = index_dir / "test.md"
+        p.write_text("# Test\n", encoding="utf-8")
+        count = add_file(index_dir, [str(p)])
+        assert len(count) == 1
+        # Verify DB was created
+        assert (index_dir / "mindex.sqlite").exists()
+
+    def test_add_creates_schema(self, index_dir):
+        """add_file should create the full schema when the DB does not exist."""
+        p = index_dir / "test.md"
+        p.write_text("# Test\n", encoding="utf-8")
+        add_file(index_dir, [str(p)])
+
+        with _db(index_dir) as conn:
+            tables = conn.execute(
+                "SELECT name FROM sqlite_master WHERE type='table'"
+            ).fetchall()
+            table_names = [t["name"] for t in tables]
+            assert "docs" in table_names
+            assert "docs_fts" in table_names
+
+    def test_db_must_exist_false_creates_db(self, index_dir):
+        """_db with must_exist=False should not raise and should create the DB."""
+        with _db(index_dir, must_exist=False) as conn:
+            assert conn is not None
+        assert (index_dir / "mindex.sqlite").exists()
+
+    def test_db_must_exist_true_raises(self, index_dir):
+        """_db with must_exist=True should raise when DB does not exist."""
+        with pytest.raises(FileNotFoundError, match="Index database not found"):
+            _db(index_dir, must_exist=True)
+
+    def test_all_non_add_commands_require_db(self, index_dir):
+        """Verify all non-add command functions exist and are callable."""
+        from mindex import __all__
+
+        # All public commands that interact with the DB
+        commands_requiring_db = [
+            "del_file",
+            "info_by_file",
+            "read_file",
+            "search",
+            "file_search",
+            "lint",
+        ]
+
+        for name in commands_requiring_db:
+            assert name in __all__, f"{name} should be in __all__"
+            obj = getattr(__import__("mindex", fromlist=[name]), name)
+            assert callable(obj), f"{name} should be callable"
+        # Individual tests above verify each raises FileNotFoundError without DB.
+
+
 # ── _db (database) tests ──────────────────────────────────────────────
 
 
 class TestDB:
     def test_db_connection(self, index_dir):
-        with _db(index_dir) as conn:
+        with _db(index_dir, must_exist=False) as conn:
             assert conn is not None
             result = conn.execute("SELECT 1").fetchone()
             assert result[0] == 1
 
     def test_db_auto_closes(self, index_dir):
-        conn = _db(index_dir).conn
+        conn = _db(index_dir, must_exist=False).conn
         conn.close()
         # Should be able to create another connection after close
-        with _db(index_dir) as conn2:
+        with _db(index_dir, must_exist=False) as conn2:
             assert conn2 is not None
 
     def test_db_creates_schema(self, index_dir):
-        with _db(index_dir) as conn:
+        with _db(index_dir, must_exist=False) as conn:
             tables = conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()
             table_names = [t["name"] for t in tables]
             assert "docs" in table_names
             assert "docs_fts" in table_names
 
     def test_db_wal_mode(self, index_dir):
-        with _db(index_dir) as conn:
+        with _db(index_dir, must_exist=False) as conn:
             result = conn.execute("PRAGMA journal_mode").fetchone()
             assert result[0] in ("wal", "wal")
 

@@ -12,7 +12,7 @@ class LintInfo:
     status: str
 
 
-def lint(index_dir: Path, file_path: list[str] | None = None) -> list[LintInfo]:
+def lint(index_dir: Path, file_path: list[str] | None = None, fix: bool = False) -> list[LintInfo]:
     """Check whether indexed files still exist on disk.
 
     Queries the index for all (or filtered) file paths and checks each one
@@ -45,5 +45,13 @@ def lint(index_dir: Path, file_path: list[str] | None = None) -> list[LintInfo]:
         fp = Path(row["path"])
         status = "OK" if fp.is_file() else "missing"
         results.append(LintInfo(path=str(fp), status=status))
+
+    if fix:
+        with _db(index_dir) as conn:
+            for result in results:
+                if result.status == "missing":
+                    # delete the missing file from the index
+                    conn.execute("DELETE FROM docs WHERE path = ?", (result.path,))
+            conn.commit()
 
     return results

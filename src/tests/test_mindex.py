@@ -671,6 +671,66 @@ class TestLint:
         assert len(results) == 3
         assert all(r.status == "OK" for r in results)
 
+    def test_lint_fix_deletes_missing(self, indexed_sample_files, index_dir):
+        """When fix=True, missing files should be deleted from the index."""
+        # Add a file, then delete it from disk
+        p = index_dir / "ghost.md"
+        p.write_text("# Ghost\n", encoding="utf-8")
+        add_file(index_dir, [str(p)])
+        p.unlink()  # delete from disk
+
+        # Verify it's in the index
+        infos = info_by_file(index_dir, ["*"])
+        assert any("ghost.md" in r.path for r in infos)
+
+        # Lint with fix
+        results = lint(index_dir, fix=True)
+        statuses = {r.path: r.status for r in results}
+        assert any("ghost.md" in k and v == "missing" for k, v in statuses.items())
+
+        # Verify it's been removed from the index
+        infos = info_by_file(index_dir, ["*"])
+        assert not any("ghost.md" in r.path for r in infos)
+
+    def test_lint_fix_keeps_existing(self, indexed_sample_files, index_dir):
+        """When fix=True, existing files should remain in the index."""
+        # Delete one file from disk
+        indexed_sample_files["test1.md"].unlink()
+
+        lint(index_dir, fix=True)
+
+        # Verify existing files are still in the index
+        infos = info_by_file(index_dir, ["*"])
+        paths = {r.path for r in infos}
+        assert not any("test1.md" in p for p in paths)
+        assert any("test2.md" in p for p in paths)
+        assert any("deep.md" in p for p in paths)
+
+    def test_lint_fix_no_missing(self, indexed_sample_files, index_dir):
+        """When fix=True but no files are missing, index should be unchanged."""
+        count_before = len(info_by_file(index_dir, ["*"]))
+        results = lint(index_dir, fix=True)
+        count_after = len(info_by_file(index_dir, ["*"]))
+        assert count_before == count_after
+        assert all(r.status == "OK" for r in results)
+
+    def test_lint_fix_with_filter(self, indexed_sample_files, index_dir):
+        """fix=True with a filter should only delete missing files matching the filter."""
+        # Add and delete a file outside the filter
+        p = index_dir / "ghost.md"
+        p.write_text("# Ghost\n", encoding="utf-8")
+        add_file(index_dir, [str(p)])
+        p.unlink()
+
+        # Lint with filter only on test files
+        results = lint(index_dir, file_path=[str(index_dir / "test*.md")], fix=True)
+
+        # ghost.md should still be in the index (not matched by filter)
+        infos = info_by_file(index_dir, ["*"])
+        assert any("ghost.md" in r.path for r in infos)
+        # test files should be OK
+        assert all(r.status == "OK" for r in results)
+
 
 # ── Missing database tests ────────────────────────────────────────────
 

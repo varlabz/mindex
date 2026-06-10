@@ -161,6 +161,12 @@ Examples:
         default=[],
         help='Optional path or wildcard pattern(s) to filter files (e.g., "*.md" "sub/*")',
     )
+    p_lint.add_argument(
+        "--fix",
+        action="store_true",
+        default=False,
+        help="Delete records from the index for files that no longer exist on disk",
+    )
 
     # Add --format to ALL subcommands in one place
     for p in (p_add, p_del, p_info, p_read, p_search, p_sf, p_lint):
@@ -214,7 +220,7 @@ Examples:
 
     elif args.command == "lint":
         paths = [str(Path(p).expanduser()) for p in args.paths] if args.paths else None
-        results = lint(index_dir, paths)
+        results = lint(index_dir, paths, fix=args.fix)
         print_results(results, args.format)
 
 

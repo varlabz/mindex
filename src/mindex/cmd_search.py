@@ -35,7 +35,8 @@ def search(index_dir: Path, query: str, file_path: list[str] | None, limit: int)
         limit: Maximum number of search results to return.
 
     Returns:
-        SearchResponse with matching file paths, content snippets, timestamps, and total match count.
+        SearchResponse with matching file paths, content snippets,
+        timestamps, and total match count.
 
     Raises:
         ValueError: If query is empty/whitespace or shorter than 3 characters.

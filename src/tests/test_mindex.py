@@ -807,9 +807,7 @@ class TestMissingDatabase:
         add_file(index_dir, [str(p)])
 
         with _db(index_dir) as conn:
-            tables = conn.execute(
-                "SELECT name FROM sqlite_master WHERE type='table'"
-            ).fetchall()
+            tables = conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()
             table_names = [t["name"] for t in tables]
             assert "docs" in table_names
             assert "docs_fts" in table_names

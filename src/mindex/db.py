@@ -22,7 +22,9 @@ class _db:
     def get_db(index_dir: Path, must_exist: bool = True) -> sqlite3.Connection:
         db_file = index_dir / DB_FILE
         if not db_file.exists() and must_exist:
-            raise FileNotFoundError(f"Index database not found: {db_file}. Add files first using 'mindex add'.")
+            raise FileNotFoundError(
+                f"Index database not found: {db_file}. Add files first using 'mindex add'."
+            )
 
         conn = sqlite3.connect(db_file)
         conn.row_factory = sqlite3.Row

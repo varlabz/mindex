@@ -13,9 +13,15 @@ class SearchResult:
     updated_at: str
 
 
+@dataclass
+class SearchResponse:
+    results: list[SearchResult]
+    total: int
+
+
 def search(
     index_dir: Path, query: str, file_path: list[str] | None, limit: int
-) -> list[SearchResult]:
+) -> SearchResponse:
     """Search indexed files using FTS5 full-text search.
 
     Runs an FTS5 MATCH query against the index, optionally restricting results
@@ -30,7 +36,7 @@ def search(
         limit: Maximum number of search results to return.
 
     Returns:
-        list[SearchResult] with matching file paths, content snippets, and timestamps.
+        SearchResponse with matching file paths, content snippets, timestamps, and total match count.
 
     Raises:
         ValueError: If query is empty/whitespace or shorter than 3 characters.
@@ -45,27 +51,41 @@ def search(
         )
 
     with _db(index_dir) as conn:
-        sql = """
-            SELECT d.path,
-                   snippet(docs_fts, 0, '', '', '...', 64) as snippet,
-                   d.updated_at
-            FROM docs_fts
-            JOIN docs d ON docs_fts.rowid = d.id
-            WHERE docs_fts MATCH ?
-        """
         fts_query = query
         params: list = [fts_query]
 
+        # Build WHERE clause (shared between count and fetch queries)
+        where = "WHERE docs_fts MATCH ?"
         if file_path:
             clauses = []
             for fp in file_path:
                 clauses.append("path GLOB ?")
                 params.append(fp)
-            sql += " AND (" + " OR ".join(clauses) + ")"
+            where += " AND (" + " OR ".join(clauses) + ")"
 
-        sql += " ORDER BY bm25(docs_fts) "
-        sql += " LIMIT ? "
+        # 1. Count total matches (no LIMIT)
+        count_sql = f"""
+            SELECT COUNT(*)
+            FROM docs_fts
+            JOIN docs d ON docs_fts.rowid = d.id
+            {where}"""
+        total = conn.execute(count_sql, params).fetchone()[0]
+
+        # 2. Fetch limited results
+        sql = f"""
+            SELECT d.path,
+                   snippet(docs_fts, 0, '', '', '...', 64) as snippet,
+                   d.updated_at
+            FROM docs_fts
+            JOIN docs d ON docs_fts.rowid = d.id
+            {where}
+            ORDER BY bm25(docs_fts)
+            LIMIT ?
+        """
         params.append(limit)
 
         rows = conn.execute(sql, params).fetchall()
-        return [SearchResult(**row) for row in rows]
+        return SearchResponse(
+            results=[SearchResult(**row) for row in rows],
+            total=total,
+        )

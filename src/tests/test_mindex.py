@@ -8,6 +8,7 @@ import pytest
 from mindex import (
     FileInfo,
     FileSearchResult,
+    SearchResponse,
     SearchResult,
     _db,
     add_file,
@@ -255,8 +256,8 @@ class TestDelFile:
     def test_del_removes_from_search(self, indexed_sample_files, index_dir):
         add_file(index_dir, [str(indexed_sample_files["test1.md"])])
         del_file(index_dir, [str(indexed_sample_files["test1.md"])])
-        results = search(index_dir, "hello", file_path=None, limit=100)
-        assert all("test1.md" not in r.path for r in results)
+        resp = search(index_dir, "hello", file_path=None, limit=100)
+        assert all("test1.md" not in r.path for r in resp.results)
 
     def test_del_glob_no_match(self, empty_db):
         result = del_file(empty_db, ["/nonexistent/*.md"])
@@ -453,13 +454,15 @@ class TestReadFile:
 
 class TestSearch:
     def test_search_basic(self, indexed_sample_files, index_dir):
-        results = search(index_dir, "hello", file_path=None, limit=100)
-        assert len(results) >= 1
-        assert any("test1.md" in r.path for r in results)
+        resp = search(index_dir, "hello", file_path=None, limit=100)
+        assert isinstance(resp, SearchResponse)
+        assert resp.total >= 1
+        assert any("test1.md" in r.path for r in resp.results)
 
     def test_search_no_results(self, indexed_sample_files, index_dir):
-        results = search(index_dir, "zzzzzzzzzzzzzz", file_path=None, limit=100)
-        assert results == []
+        resp = search(index_dir, "zzzzzzzzzzzzzz", file_path=None, limit=100)
+        assert resp.total == 0
+        assert resp.results == []
 
     def test_search_empty_query_raises(self, indexed_sample_files, index_dir):
         with pytest.raises(ValueError, match="Query cannot be empty"):
@@ -469,32 +472,43 @@ class TestSearch:
         with pytest.raises(ValueError, match="Query cannot be empty"):
             search(index_dir, "   ", file_path=None, limit=100)
 
+    def test_search_total_count(self, indexed_sample_files, index_dir):
+        resp = search(index_dir, "file", file_path=None, limit=100)
+        assert isinstance(resp.total, int)
+        assert resp.total >= 2  # all three files contain "file"
+
     def test_search_too_short_raises(self, indexed_sample_files, index_dir):
         with pytest.raises(ValueError, match="Query too short"):
             search(index_dir, "ab", file_path=None, limit=100)
 
+    def test_search_total_vs_limit(self, indexed_sample_files, index_dir):
+        resp = search(index_dir, "file", file_path=None, limit=1)
+        # total reflects all matches, not just limited results
+        assert resp.total >= 2
+        assert len(resp.results) <= 1
+
     def test_search_exact_3_chars(self, indexed_sample_files, index_dir):
         # "the" is 3 chars — should work
-        results = search(index_dir, "the", file_path=None, limit=100)
-        # May or may not find results depending on content, but shouldn't raise
-        assert isinstance(results, list)
+        resp = search(index_dir, "the", file_path=None, limit=100)
+        assert isinstance(resp, SearchResponse)
 
     def test_search_with_file_filter(self, indexed_sample_files, index_dir):
-        results = search(index_dir, "another", file_path=["*test2*"], limit=100)
-        assert len(results) >= 1
-        assert any("test2.md" in r.path for r in results)
+        resp = search(index_dir, "another", file_path=["*test2*"], limit=100)
+        assert len(resp.results) >= 1
+        assert any("test2.md" in r.path for r in resp.results)
 
     def test_search_with_file_filter_no_match(self, indexed_sample_files, index_dir):
-        results = search(index_dir, "hello", file_path=["*nonexistent*"], limit=100)
-        assert results == []
+        resp = search(index_dir, "hello", file_path=["*nonexistent*"], limit=100)
+        assert resp.total == 0
+        assert resp.results == []
 
     def test_search_with_limit(self, indexed_sample_files, index_dir):
-        results = search(index_dir, "file", file_path=None, limit=1)
-        assert len(results) <= 1
+        resp = search(index_dir, "file", file_path=None, limit=1)
+        assert len(resp.results) <= 1
 
     def test_search_result_fields(self, indexed_sample_files, index_dir):
-        results = search(index_dir, "hello", file_path=None, limit=100)
-        r = results[0]
+        resp = search(index_dir, "hello", file_path=None, limit=100)
+        r = resp.results[0]
         assert isinstance(r, SearchResult)
         assert isinstance(r.path, str)
         assert isinstance(r.snippet, str)
@@ -502,65 +516,66 @@ class TestSearch:
 
     def test_search_special_fts_chars(self, indexed_sample_files, index_dir):
         # Test that FTS special chars are properly escaped
-        results = search(index_dir, '"hello"', file_path=None, limit=100)
-        assert isinstance(results, list)
+        resp = search(index_dir, '"hello"', file_path=None, limit=100)
+        assert isinstance(resp, SearchResponse)
 
     def test_search_double_quotes_in_query(self, indexed_sample_files, index_dir):
-        results = search(index_dir, '"test"', file_path=None, limit=100)
-        assert isinstance(results, list)
+        resp = search(index_dir, '"test"', file_path=None, limit=100)
+        assert isinstance(resp, SearchResponse)
 
     def test_search_case_insensitive(self, indexed_sample_files, index_dir):
-        results_lower = search(index_dir, "hello", file_path=None, limit=100)
-        results_upper = search(index_dir, "HELLO", file_path=None, limit=100)
+        resp_lower = search(index_dir, "hello", file_path=None, limit=100)
+        resp_upper = search(index_dir, "HELLO", file_path=None, limit=100)
         # FTS5 is case-insensitive by default
-        assert len(results_lower) == len(results_upper)
+        assert resp_lower.total == resp_upper.total
 
     def test_search_multiple_file_filters(self, indexed_sample_files, index_dir):
-        results = search(index_dir, "file", file_path=["*test1*", "*test2*"], limit=100)
-        assert len(results) >= 2
-        assert any("test1.md" in r.path for r in results)
-        assert any("test2.md" in r.path for r in results)
+        resp = search(index_dir, "file", file_path=["*test1*", "*test2*"], limit=100)
+        assert len(resp.results) >= 2
+        assert any("test1.md" in r.path for r in resp.results)
+        assert any("test2.md" in r.path for r in resp.results)
 
     def test_search_empty_file_filters(self, indexed_sample_files, index_dir):
-        results = search(index_dir, "hello", file_path=[], limit=100)
-        assert len(results) >= 1
+        resp = search(index_dir, "hello", file_path=[], limit=100)
+        assert len(resp.results) >= 1
 
     def test_search_multiple_paths_partial_match(self, indexed_sample_files, index_dir):
         """One glob matches, another doesn't — results should still be returned."""
-        results = search(index_dir, "file", file_path=["*test1*", "*nonexistent*"], limit=100)
-        assert len(results) >= 1
-        assert any("test1.md" in r.path for r in results)
-        assert not any("nonexistent" in r.path for r in results)
+        resp = search(index_dir, "file", file_path=["*test1*", "*nonexistent*"], limit=100)
+        assert len(resp.results) >= 1
+        assert any("test1.md" in r.path for r in resp.results)
+        assert not any("nonexistent" in r.path for r in resp.results)
 
     def test_search_multiple_paths_all_no_match(self, indexed_sample_files, index_dir):
         """All patterns don't match — empty results."""
-        results = search(index_dir, "file", file_path=["*nope1*", "*nope2*"], limit=100)
-        assert results == []
+        resp = search(index_dir, "file", file_path=["*nope1*", "*nope2*"], limit=100)
+        assert resp.total == 0
+        assert resp.results == []
 
     def test_search_multiple_paths_overlap(self, indexed_sample_files, index_dir):
         """Overlapping globs matching the same file — no duplicates, results deduplicated by FTS."""
-        results = search(index_dir, "hello", file_path=["*test1*", "test1*"], limit=100)
-        assert len(results) >= 1
+        resp = search(index_dir, "hello", file_path=["*test1*", "test1*"], limit=100)
+        assert len(resp.results) >= 1
         # Count unique paths
-        paths = {r.path for r in results}
+        paths = {r.path for r in resp.results}
         assert len(paths) >= 1
         assert all("test1" in p for p in paths)
 
     def test_search_multiple_paths_subdirectory(self, indexed_sample_files, index_dir):
         """Multiple patterns targeting files in subdirectories."""
-        results = search(index_dir, "content", file_path=["*sub/*", "*test2*"], limit=100)
-        assert len(results) >= 2
-        assert any("deep.md" in r.path for r in results)
-        assert any("test2.md" in r.path for r in results)
+        resp = search(index_dir, "content", file_path=["*sub/*", "*test2*"], limit=100)
+        assert len(resp.results) >= 2
+        assert any("deep.md" in r.path for r in resp.results)
+        assert any("test2.md" in r.path for r in resp.results)
 
     def test_search_multiple_paths_union(self, indexed_sample_files, index_dir):
         """Multiple path filters return the union of results."""
         # "File" appears in all files (case-insensitive FTS5 match)
-        results_t1 = search(index_dir, "file", file_path=["*test1*"], limit=100)
-        results_t2 = search(index_dir, "file", file_path=["*test2*"], limit=100)
-        results_both = search(index_dir, "file", file_path=["*test1*", "*test2*"], limit=100)
+        resp_t1 = search(index_dir, "file", file_path=["*test1*"], limit=100)
+        resp_t2 = search(index_dir, "file", file_path=["*test2*"], limit=100)
+        resp_both = search(index_dir, "file", file_path=["*test1*", "*test2*"], limit=100)
         # Combined results should be at least the union
-        assert len(results_both) >= len(results_t1) + len(results_t2)
+        assert len(resp_both.results) >= len(resp_t1.results) + len(resp_t2.results)
 
 
 # ── file_search tests ──────────────────────────────────────────────────
@@ -743,6 +758,14 @@ class TestMissingDatabase:
         with pytest.raises(FileNotFoundError, match="Index database not found"):
             search(index_dir, "hello", file_path=None, limit=10)
 
+    def test_search_response_structure(self, indexed_sample_files, index_dir):
+        """Verify SearchResponse has results and total fields."""
+        resp = search(index_dir, "hello", file_path=None, limit=10)
+        assert hasattr(resp, "results")
+        assert hasattr(resp, "total")
+        assert isinstance(resp.results, list)
+        assert isinstance(resp.total, int)
+
     def test_file_search_raises_without_db(self, index_dir):
         """file_search should raise FileNotFoundError when mindex.sqlite does not exist."""
         with pytest.raises(FileNotFoundError, match="Index database not found"):
@@ -863,15 +886,16 @@ class TestIntegration:
         add_file(index_dir, [str(p)])
 
         # Search should find it
-        results = search(index_dir, "cycle", file_path=None, limit=100)
-        assert len(results) >= 1
+        resp = search(index_dir, "cycle", file_path=None, limit=100)
+        assert len(resp.results) >= 1
 
         # Delete it
         del_file(index_dir, [str(p)])
 
         # Search should no longer find it
-        results = search(index_dir, "cycle", file_path=None, limit=100)
-        assert len(results) == 0
+        resp = search(index_dir, "cycle", file_path=None, limit=100)
+        assert resp.total == 0
+        assert resp.results == []
 
     def test_add_update_search_cycle(self, index_dir):
         p = index_dir / "update.md"
@@ -883,8 +907,8 @@ class TestIntegration:
         add_file(index_dir, [str(p)])
 
         # Search should find updated content
-        results = search(index_dir, "updated", file_path=None, limit=100)
-        assert len(results) >= 1
+        resp = search(index_dir, "updated", file_path=None, limit=100)
+        assert len(resp.results) >= 1
 
     def test_full_workflow(self, index_dir):
         # Create and index files
@@ -898,8 +922,8 @@ class TestIntegration:
         assert len(infos) == 5
 
         # Search
-        results = search(index_dir, "document", file_path=None, limit=3)
-        assert len(results) <= 3
+        resp = search(index_dir, "document", file_path=None, limit=3)
+        assert len(resp.results) <= 3
 
         # Read a file
         content = read_file(index_dir, str(index_dir / "doc0.md"), start=0, size=100)
@@ -927,8 +951,8 @@ class TestIntegration:
         p.write_text("# Unicode Test\nHello 世界！ مرحبا 🌍\n", encoding="utf-8")
         add_file(index_dir, [str(p)])
 
-        results = search(index_dir, "unicode", file_path=None, limit=100)
-        assert len(results) >= 1
+        resp = search(index_dir, "unicode", file_path=None, limit=100)
+        assert len(resp.results) >= 1
 
         content = read_file(index_dir, str(p), start=0, size=100)
         assert "世界" in content.content
@@ -939,8 +963,8 @@ class TestIntegration:
         p.write_text(large_content, encoding="utf-8")
         add_file(index_dir, [str(p)])
 
-        results = search(index_dir, "line", file_path=None, limit=100)
-        assert len(results) >= 1
+        resp = search(index_dir, "line", file_path=None, limit=100)
+        assert len(resp.results) >= 1
 
         content = read_file(index_dir, str(p), start=0, size=100)
         assert "Line 0" in content.content
@@ -972,8 +996,8 @@ class TestIntegration:
         p.write_text("# Numbers\n123 456 789\n", encoding="utf-8")
         add_file(index_dir, [str(p)])
 
-        results = search(index_dir, "123", file_path=None, limit=100)
-        assert len(results) >= 1
+        resp = search(index_dir, "123", file_path=None, limit=100)
+        assert len(resp.results) >= 1
 
     def test_multiple_add_same_file(self, index_dir):
         p = index_dir / "multi.md"

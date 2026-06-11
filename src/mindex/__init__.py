@@ -6,7 +6,7 @@ from .cmd_file_search import FileSearchResult, file_search
 from .cmd_info_file import FileInfo, info_by_file
 from .cmd_lint import lint
 from .cmd_read_file import ReadResult, read_file
-from .cmd_search import SearchResult, search
+from .cmd_search import SearchResponse, SearchResult, search
 from .db import _db
 
 __version__ = "0.1.0"
@@ -18,6 +18,7 @@ __all__ = [
     "ReadResult",
     "search",
     "SearchResult",
+    "SearchResponse",
     "file_search",
     "lint",
     "FileInfo",

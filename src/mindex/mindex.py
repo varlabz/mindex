@@ -142,13 +142,13 @@ Examples:
     p_search.add_argument(
         "paths", nargs="*", default=[], help="Filter by file path(s) (wildcard, e.g. '*.md')"
     )
-    p_search.add_argument("-n", "--limit", type=int, default=25, help="Max results")
+    p_search.add_argument("-n", "--limit", type=int, default=15, help="Max results")
 
     # file search
     p_sf = sub.add_parser("fsearch", help="Search within an indexed file")
     p_sf.add_argument("query", help="Search query")
     p_sf.add_argument("path", type=Path, help="Path to the indexed file to search")
-    p_sf.add_argument("-n", "--limit", type=int, default=25, help="Max results")
+    p_sf.add_argument("-n", "--limit", type=int, default=15, help="Max results")
 
     # lint
     p_lint = sub.add_parser(

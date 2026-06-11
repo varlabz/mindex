@@ -206,7 +206,7 @@ Examples:
     elif args.command == "search":
         paths = [str(Path(p).expanduser()) for p in args.paths] if args.paths else None
         results = search(index_dir, args.query, file_path=paths, limit=args.limit)
-        print_results(results, args.format)
+        print_results([results], args.format)
 
     elif args.command == "fsearch":
         path = str(args.path.expanduser().absolute())

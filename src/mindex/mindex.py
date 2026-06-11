@@ -226,20 +226,21 @@ Examples:
 
 def print_results(results: list, fmt: str) -> None:
     """Print a list of records in the given format."""
-    if not results:
-        if fmt == "json":
-            print("[]")
-        else:
-            print("No records found.")
-        return
+    obj = [
+        asdict(r) if isinstance(r, object) and hasattr(r, "__dataclass_fields__") else r
+        for r in results
+    ]
     if fmt == "json":
-        print(json.dumps([asdict(r) for r in results], indent=2))
+        print(json.dumps(obj, indent=2))
     else:
-        for r in results:
+        for r in obj:
             print("-" * 40)
-            for k, v in asdict(r).items():
+            for k, v in r.items():
+                if isinstance(v, list):
+                    print_results(v, fmt)
+                    continue
                 print(f"{k}: {v or '-'}")
-            print()
+            print("-" * 40)
 
 
 if __name__ == "__main__":

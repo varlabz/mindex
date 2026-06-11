@@ -16,12 +16,11 @@ class SearchResult:
 @dataclass
 class SearchResponse:
     results: list[SearchResult]
+    results_count: int
     total: int
 
 
-def search(
-    index_dir: Path, query: str, file_path: list[str] | None, limit: int
-) -> SearchResponse:
+def search(index_dir: Path, query: str, file_path: list[str] | None, limit: int) -> SearchResponse:
     """Search indexed files using FTS5 full-text search.
 
     Runs an FTS5 MATCH query against the index, optionally restricting results
@@ -87,5 +86,6 @@ def search(
         rows = conn.execute(sql, params).fetchall()
         return SearchResponse(
             results=[SearchResult(**row) for row in rows],
+            results_count=len(rows),
             total=total,
         )
